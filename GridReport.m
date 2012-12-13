@@ -87,6 +87,7 @@
 	//final dictionary
 	NSString *name = [[self xgridGrid] name];
 	NSString *identifier = [[self xgridGrid] identifier];
+	float workingAgentPercentage = 100.0 * agentCount[XGResourceStateWorking] / (([agents count])?[agents count]:1.0);
 	NSDictionary *reportDictionary = [NSDictionary dictionaryWithObjectsAndKeys:
 		
 		name?name:@"", @"name",
@@ -102,7 +103,7 @@
 		[NSNumber numberWithInt:[agents count]],@"totalAgentCount",
 		
 		
-		[NSNumber numberWithFloat:100.0 * agentCount[XGResourceStateWorking] / [agents count]],@"workingAgentPercentage",
+		[NSNumber numberWithFloat:workingAgentPercentage],@"workingAgentPercentage",
 		
 		[NSNumber numberWithInt:onlineProcessorCount],@"onlineProcessorCount",
 		[NSNumber numberWithInt:processorCount[XGResourceStateWorking]],@"workingProcessorCount",

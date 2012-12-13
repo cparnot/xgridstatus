@@ -2,6 +2,7 @@
 
 @interface XGController (XGControllerPrivateForXgridStatus)
 
+- (NSString *)name;
 - (NSArray *)agents;
 - (void)sendAgentListRequest;
 

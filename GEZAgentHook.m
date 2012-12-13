@@ -30,9 +30,9 @@ NSString *GEZAgentHookDidSyncNotification = @"GEZAgentHookDidSyncNotification";
 {
 	self = [super init];
 	if ( self != nil ) {
-		[self setXgridAgent:agent];
 		isSynced = NO;
 		isObserving = NO;
+		[self setXgridAgent:agent];
 	}
 	return self;
 }

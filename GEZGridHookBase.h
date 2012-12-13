@@ -19,22 +19,39 @@ __END_LICENSE__ */
  */
 
 
-APPKIT_EXTERN NSString *GEZGridHookDidChangeAgentsNotification;
-APPKIT_EXTERN NSString *GEZGridHookDidLoadAgentsNotification;
+APPKIT_EXTERN NSString *GEZGridHookDidUpdateNotification;
+APPKIT_EXTERN NSString *GEZGridHookDidLoadNotification;
+APPKIT_EXTERN NSString *GEZGridHookDidChangeNameNotification;
+APPKIT_EXTERN NSString *GEZGridHookDidChangeJobsNotification;
 
-#import "GEZGridHookBase.h"
 
 @class GEZServerHook;
 @class GEZResourceObserver;
 
-@interface GEZGridHook : GEZGridHookBase
+@interface GEZGridHookBase : NSObject
 {
-	//observing XGAgent objects
-	NSSet *xgridAgentObservers;
-	BOOL allAgentsUpdated;
+	XGGrid *xgridGrid;
+	GEZServerHook *serverHook;
+	int gridHookState; //private enum
+	GEZResourceObserver *xgridGridObserver;
+
+	//observing XGJob objects
+	NSSet *xgridJobObservers;
+	BOOL allJobsUpdated;
 }
 
-- (BOOL)agentsLoaded;
++ (id)gridHookWithXgridGrid:(XGGrid *)aGrid serverHook:(GEZServerHook *)aServer;
++ (id)gridHookWithIdentifier:(NSString *)identifier serverHook:(GEZServerHook *)aServer;
+
+//accessors
+- (void)setXgridGrid:(XGGrid *)newGrid;
+- (XGGrid *)xgridGrid;
+- (BOOL)isUpdated;
+- (BOOL)isLoaded;
+- (GEZServerHook *)serverHook;
+
+//this is designed to be subclasses, e.g. to include agents
+- (BOOL)checkIfAllChildrenUpdated;
 
 @end
 

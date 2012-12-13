@@ -9,12 +9,9 @@
 #import "StatusReporter.h"
 #import "GEZServerHook.h"
 #import "GEZGridHook.h"
-#import "GEZAgentHook.h"
+//#import "GEZAgentHook.h"
 #import "GridReport.h"
 #import "PlistCategories.h"
-
-//used to notify the user of progress when things go slowly
-#define PROGRESS_NOTIFICATION_INTERVAL 10.0
 
 @implementation StatusReporter
 
@@ -46,6 +43,18 @@
 	exit (0);
 }
 
+//used to notify the user of progress when things go slowly
+#define INTERVAL_FOR_LOADING_PROGRESS_REPORTS_DEFAULT 5
+- (NSTimeInterval)intervalForLoadingProgressReports
+{
+	[[NSUserDefaults standardUserDefaults] setObject:@"test" forKey:@"test"];
+	[[NSUserDefaults standardUserDefaults] synchronize];
+	id userDefaultsValue;
+	if ( userDefaultsValue = [[NSUserDefaults standardUserDefaults] objectForKey:@"IntervalForLoadingProgressReports"] )
+		return [userDefaultsValue doubleValue];
+	else
+		return INTERVAL_FOR_LOADING_PROGRESS_REPORTS_DEFAULT;
+}
 
 #pragma mark *** Accessors ***
 
@@ -83,78 +92,12 @@
 }
 
 
-- (int)countServerLoaded
-{
-	int countServerLoaded = 0;
-	NSEnumerator *e = [servers objectEnumerator];
-	GEZServerHook *aServer;
-	while ( aServer = [e nextObject] )
-		if ( [aServer isLoaded] )
-			countServerLoaded++;
-	return countServerLoaded;
-}
 
 - (BOOL)allServersLoaded
 {
-	return ( [self countServerLoaded] >= [servers count] );
+	return ( [[servers valueForKeyPath:@"@sum.isLoaded"] intValue] >= [servers count] );
 }
 
-- (int)countAgents
-{
-	int countAgents = 0;
-	NSEnumerator *e = [servers objectEnumerator];
-	GEZServerHook *aServer;
-	while ( aServer = [e nextObject] ) {
-		NSEnumerator *ee = [[aServer grids] objectEnumerator];
-		GEZGridHook *aGrid;
-		while ( aGrid = [ee nextObject] )
-			countAgents += [[[aGrid xgridGrid] agents] count];
-	}
-	return countAgents;
-}
-
-- (int)countAgentLoaded
-{
-	int countAgentLoaded = 0;
-	NSEnumerator *e = [servers objectEnumerator];
-	GEZServerHook *aServer;
-	while ( aServer = [e nextObject] ) {
-		NSEnumerator *ee = [[aServer grids] objectEnumerator];
-		GEZGridHook *aGrid;
-		while ( aGrid = [ee nextObject] ) {
-			NSEnumerator *eee = [[aGrid agentHooks] objectEnumerator];
-			GEZAgentHook *anAgent;
-			while ( anAgent = [eee nextObject] )
-				if ( [anAgent isSynced] )
-					countAgentLoaded ++;
-		}
-	}
-	return countAgentLoaded;
-}
-
-- (BOOL)allAgentsLoaded
-{
-	BOOL allReady = YES;
-	NSEnumerator *e1 = [servers objectEnumerator];
-	GEZServerHook *aServer;
-	while ( aServer = [e1 nextObject] ) {
-		NSArray *grids = [aServer grids];
-		if ( [grids count] == 0 ) {
-			allReady = NO;
-			[e1 allObjects];
-		}
-		NSEnumerator *e2 = [grids objectEnumerator];
-		GEZGridHook *aGrid;
-		while ( aGrid = [e2 nextObject]) {
-			if ( [aGrid agentsLoaded] == NO ) {
-				allReady = NO;
-				[e2 allObjects];
-				[e1 allObjects];
-			}
-		}
-	}
-	return allReady;
-}
 
 
 #pragma mark *** Status construction ***
@@ -207,32 +150,61 @@ NSNumber *intSum(NSDictionary *dic1, NSDictionary *dic2, NSString *key)
 	return sum;
 }
 
-
 - (NSDictionary *)statusDictionary
 {
+	return currentStatusDictionary;
+}
+
+//the report dictionary created by this method is used by all other 'statusXXX' methods
+- (BOOL)updateStatusDictionary
+{
+	//if no server loaded, no new status
+	if ( [[servers valueForKeyPath:@"@sum.isLoaded"] intValue] < 1 )
+		return NO;
+	
+	//this will contain a list of subdictionaries, one for each server
 	NSMutableDictionary *serverReports = [NSMutableDictionary dictionaryWithCapacity:[servers count]];
 	
 	//level 1 and level 2 dictionaries = grids and servers
 	NSEnumerator *e = [servers objectEnumerator];
 	GEZServerHook *aServer;
 	while ( aServer = [e nextObject] ) {
-		NSArray *grids = [aServer grids];
-		NSMutableDictionary *gridReports = [NSMutableDictionary dictionaryWithCapacity:[grids count]];
-		NSEnumerator *ee = [grids objectEnumerator];
-		GEZGridHook *aGrid;
-		while ( aGrid = [ee nextObject] )
-			[gridReports setObject:[aGrid reportWithAgentList:agentDetails] forKey:[[aGrid xgridGrid] name]];
-		NSMutableDictionary *serverDictionary = [self addStatusDictionaries:[gridReports allValues]];
-		if ( gridDetails ) {
-			[serverDictionary setObject:gridReports forKey:@"grids"];
-			//if agents are listed in the grids, no need for them in the controller details
-			if ( agentDetails && serverDetails )
-				[serverDictionary removeObjectForKey:@"agents"];
+		
+		NSMutableDictionary *serverDictionary = nil;
+
+		//if the server is loaded, it is up to date and we can get the correct information from it
+		if ( [aServer isLoaded] ) {
+			//printf("    Server %s loaded\n",[[aServer address] UTF8String]);
+			NSArray *grids = [aServer grids];
+			//this dictionary will contain a list of subdictionaries, one for each grid of the server
+			NSMutableDictionary *gridReports = [NSMutableDictionary dictionaryWithCapacity:[grids count]];
+			NSEnumerator *ee = [grids objectEnumerator];
+			GEZGridHook *aGrid;
+			while ( aGrid = [ee nextObject] )
+				[gridReports setObject:[aGrid reportWithAgentList:agentDetails] forKey:[[aGrid xgridGrid] name]];
+			serverDictionary = [self addStatusDictionaries:[gridReports allValues]];
+			if ( gridDetails ) {
+				[serverDictionary setObject:gridReports forKey:@"grids"];
+				//if agents are listed in the grids, no need for them in the controller details
+				if ( agentDetails && serverDetails )
+					[serverDictionary removeObjectForKey:@"agents"];
+			}
+			
+		//if the server is not loaded and thus does not have valid information, we use previous values
+		} else {
+			//printf("    Server %s not loaded\n",[[aServer address] UTF8String]);
+			serverDictionary = [lastServerReports objectForKey:[aServer address]];
 		}
-		[serverReports setObject:serverDictionary forKey:[aServer address]];
+		if ( serverDictionary != nil )
+			[serverReports setObject:serverDictionary forKey:[aServer address]];
 	}
 	
-	//final dictionary could be just the aggregated result or could contain details for each controller and/or grid
+	//keep the info for the next time, in case some servers get disconnected
+	[lastServerReports release];
+	lastServerReports = [serverReports copy];
+	
+	
+	//final dictionary could be just the aggregated result or could contain details for each controller
 	NSMutableDictionary *finalDictionary = [self addStatusDictionaries:[serverReports allValues]];
 	if ( serverDetails ) {
 		[finalDictionary setObject:serverReports forKey:@"controllers"];
@@ -254,8 +226,13 @@ NSNumber *intSum(NSDictionary *dic1, NSDictionary *dic2, NSString *key)
 		[now dateWithCalendarFormat:@"%Z" timeZone:nil],@"TimeZone",
 		nil]];
 	
-	return finalDictionary;
+	[currentStatusDictionary release];
+	currentStatusDictionary = [finalDictionary copy];
+	return YES;
 }
+
+
+#pragma mark *** Status in different formats ***
 
 - (NSData *)statusBinaryData
 {
@@ -341,28 +318,51 @@ NSNumber *intSum(NSDictionary *dic1, NSDictionary *dic2, NSString *key)
 		return [NSData data];
 }
 
-- (void)report
+#pragma mark *** Reports to the user ***
+
+- (void)reportStatus:(NSTimer *)aTimer
 {
 	DLog(NSStringFromClass([self class]),10,@"<%@:%p> %s",[self class],self,_cmd);
 	
-	if ( outputFilePath == nil ) {
-		printf ( "%s\n", [[self statusString] UTF8String] );
-	} else {
-		NSData *statusData = [self statusData];
-		if ( [statusData writeToFile:outputFilePath atomically:YES] ==NO )
-			printf ( "Error writing output file.\n" );
+	//only report if the status dictionary changed
+	if ( [self updateStatusDictionary] ) {
+		if ( outputFilePath == nil ) {
+			printf ( "%s\n", [[self statusString] UTF8String] );
+		} else {
+			NSData *statusData = [self statusData];
+			if ( [statusData writeToFile:outputFilePath atomically:YES] ==NO )
+				printf ( "Error writing output file.\n" );
+		}
 	}
 	
 	if ( reportInterval <= 0.0 )
 		exit (0);
 }
 
-- (void)reportWithTimer:(NSTimer *)aTimer
+- (void)setShouldReportStatus:(BOOL)flag
 {
 	DLog(NSStringFromClass([self class]),10,@"<%@:%p> %s",[self class],self,_cmd);
-	[self report];
-}
 
+	//stop the timer if necessary
+	if ( flag == NO && reportStatusTimer != nil ) {
+		[reportStatusTimer invalidate];
+		[reportStatusTimer autorelease];
+		reportStatusTimer = nil;
+	}
+	
+	//start the timer if not yet started
+	if ( flag == YES && reportStatusTimer == nil ) {
+		if ( [self verbose] ) {
+			if ( reportInterval > 0 )
+				printf ( "All controllers ready. Writing report every %d seconds.\n", (int)(reportInterval) );
+			else
+				printf ( "All controllers ready. Writing report.\n");
+		}
+		[self reportStatus:nil];
+		reportStatusTimer = [NSTimer scheduledTimerWithTimeInterval:reportInterval target:self selector:@selector(reportStatus:) userInfo:nil repeats:YES];
+		[reportStatusTimer retain];
+	}
+}
 
 - (void)start
 {
@@ -371,89 +371,111 @@ NSNumber *intSum(NSDictionary *dic1, NSDictionary *dic2, NSString *key)
 	NSEnumerator *e = [servers objectEnumerator];	
 	GEZServerHook *aServer;
 	while ( aServer = [e nextObject] ) {
+		[aServer setAutoconnect:YES];
+		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(serverDidConnect:) name:GEZServerHookDidConnectNotification object:aServer];		
+		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(serverDidLoad:) name:GEZServerHookDidLoadNotification object:aServer];		
+		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(serverDidDisconnect:) name:GEZServerHookDidDisconnectNotification object:aServer];		
+		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(serverDidNotConnect:) name:GEZServerHookDidNotConnectNotification object:aServer];		
+		[aServer connect];
 		if ( [aServer isLoaded] )
 			[self serverDidLoad:[NSNotification notificationWithName:GEZServerHookDidLoadNotification object:aServer]];
-		else {					
-			[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(serverDidLoad:) name:GEZServerHookDidLoadNotification object:aServer];		
-			[aServer connect];
-		}
 	}
 	
 	//report server loading to keep the user entertained if it takes a while
 	if ( [self verbose] )
-		[NSTimer scheduledTimerWithTimeInterval:PROGRESS_NOTIFICATION_INTERVAL target:self selector:@selector(reportServerLoading:) userInfo:nil repeats:YES];
+		[NSTimer scheduledTimerWithTimeInterval:[self intervalForLoadingProgressReports] target:self selector:@selector(reportProgress:) userInfo:nil repeats:YES];
 
 }
 
-- (void)reportAgentLoading:(NSTimer *)aTimer
+- (void)reportProgressForServerHook:(GEZServerHook *)aServer
 {
-	if ( [self allAgentsLoaded] ) {
-		[aTimer invalidate];
+	const char *address = [[aServer address] UTF8String];
+	if ( [aServer isLoaded] )
 		return;
+	else if ( [aServer isConnecting] )
+		printf("In progress: Controller '%s' connecting...\n", address);
+	else {
+		int countGrids = [[aServer grids] count];
+		NSArray *allAgents = [aServer valueForKeyPath:@"grids.@distinctUnionOfArrays.xgridGrid.agents"];
+		int countAgents = [allAgents count];
+		if ( [aServer isLoaded] )
+			printf("In progress: Controller '%s' loaded, %d grids, %d agents\n", address, countGrids, countAgents);
+		else if ( [aServer isUpdated] ) {
+			int countUpdatedGrids = [[aServer valueForKeyPath:@"grids.@sum.isUpdated"] intValue];
+			//if all grids are updated, we know for sure the number of agents
+			if ( countUpdatedGrids == countGrids ) {
+				int countLoadedGrids = [[aServer valueForKeyPath:@"grids.@sum.isLoaded"] intValue];
+				int countUpdatedAgents = [[allAgents valueForKeyPath:@"@sum.isUpdated"] intValue];
+				printf("In progress: Controller '%s' updated, %d/%d grids loaded, %d/%d agents loaded\n", address, countLoadedGrids, countGrids, countUpdatedAgents, countAgents);
+			} else
+				printf("In progress: Controller '%s' updated, %d/%d grids updated\n", address, countUpdatedGrids, countGrids);
+		} else {
+			printf("In progress: Controller '%s' connected, waiting for grids...\n", address);
+		}
 	}
-	if ( [self verbose] )
-		printf ( "Waiting for agent information: %d/%d agents ready\n", [self countAgentLoaded], [self countAgents] );
 }
 
-- (void)reportServerLoading:(NSTimer *)aTimer
+- (void)reportProgress:(NSTimer *)aTimer
 {
 	if ( [self allServersLoaded] ) {
 		[aTimer invalidate];
 		return;
 	}
-	if ( [self verbose] )
-		printf ( "Waiting for grid information: %d/%d controllers ready\n", [self countServerLoaded], [servers count] );
+	NSEnumerator *e = [servers objectEnumerator];
+	GEZServerHook *aServer;
+	while ( aServer = [e nextObject] )
+		[self reportProgressForServerHook:aServer];
 }
 
-#pragma mark *** notifications ***
+#pragma mark *** GEZServerHook Notifications ***
+
+- (void)serverDidConnect:(NSNotification *)notification
+{
+	DLog(NSStringFromClass([self class]),10,@"<%@:%p> %s",[self class],self,_cmd);
+	if ( [self verbose] )
+		printf ( "Controller '%s' connected.\n", [[[notification object] address] UTF8String] );
+}
+
 
 - (void)serverDidLoad:(NSNotification *)notification
 {
 	DLog(NSStringFromClass([self class]),10,@"<%@:%p> %s",[self class],self,_cmd);
 	
-	GEZServerHook *loadedServer = [notification object];
-	
-	if ( [self verbose] )
-		printf ( "Connection established with controller '%s'.\n", [[loadedServer address] UTF8String] );
-
-	NSEnumerator *e = [[loadedServer grids] objectEnumerator];
-	GEZGridHook *aGrid;
-	while  ( aGrid = [e nextObject] ) {
-		[aGrid setShouldObserveAgents:YES];
-		if ( [aGrid agentsLoaded] )
-			[self agentsDidLoad:[NSNotification notificationWithName:GEZGridHookDidChangeAgentsNotification object:aGrid]];
-		else
-			[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(agentsDidLoad:) name:GEZGridHookDidLoadAgentsNotification object:aGrid];
+	//report about the server just loaded
+	if ( [self verbose] ) {
+		GEZServerHook *theServer = [notification object];
+		NSString *message = [NSString stringWithFormat:@"Controller '%@' loaded, %@ grids, %d agents\n", [theServer address], [theServer valueForKeyPath:@"grids.@count"], [[theServer valueForKeyPath:@"grids.@distinctUnionOfArrays.xgridGrid.agents"]count]];
+		printf ( "%s", [message UTF8String] );
 	}
 	
-	//report on agent loading to keep the user entertained if it takes a while
-	if ( [self allServersLoaded] && [self verbose] )
-		[NSTimer scheduledTimerWithTimeInterval:PROGRESS_NOTIFICATION_INTERVAL target:self selector:@selector(reportAgentLoading:) userInfo:nil repeats:YES];
+	//maybe all servers are loaded
+	if ( [self allServersLoaded] )
+		[self setShouldReportStatus:YES];
 
 }
 
-- (void)agentsDidLoad:(NSNotification *)notification
+//failed connection at the first attempt will terminate the program
+- (void)serverDidNotConnect:(NSNotification *)notification
+{
+	if ( [self statusDictionary] == nil ) {
+		if ( [self verbose] ) {
+			printf ( "Controller '%s' did not connect.\n", [[[notification object] address] UTF8String] );
+			printf ( "The program will now exit.\n");
+		}
+		exit(0);
+	}
+	
+}
+
+//disconnection while running will display a message
+- (void)serverDidDisconnect:(NSNotification *)notification
 {
 	DLog(NSStringFromClass([self class]),10,@"<%@:%p> %s",[self class],self,_cmd);
-
-	//one of the grid is ready
-	GEZGridHook *loadedGrid = [notification object];
-	[[NSNotificationCenter defaultCenter] removeObserver:self name:GEZGridHookDidChangeAgentsNotification object:loadedGrid];
-	if ( [self verbose] )
-		printf ( "Grid '%s' for controller '%s' ready.\n", [[[loadedGrid xgridGrid] name] UTF8String], [[[loadedGrid serverHook] address] UTF8String] );
-	
-	//if all grids are ready, it is time for a first report
-	if ( [self allAgentsLoaded] ) {
-		if ( [self verbose] ) {
-			if ( reportInterval != 0 )
-				printf ( "All grids ready. Writing report every %d seconds.\n", (int)(reportInterval) );
-			else
-				printf ( "All grids ready. Writing report.\n");
-		}
-		[self report];
-		[NSTimer scheduledTimerWithTimeInterval:reportInterval target:self selector:@selector(reportWithTimer:) userInfo:nil repeats:YES];
+	if ( [self verbose] ) {
+		printf ( "Controller '%s' disconnected. Connection will be tried again later. [%s]\n", [[[notification object] address] UTF8String], [[[NSDate date] description] UTF8String] );
+		if ( [[servers valueForKeyPath:@"@sum.isLoaded"] intValue] > 0 )
+			printf ( "Reports will continue using the data available before disconnection.\n" );
 	}
-
 }
 
 @end
