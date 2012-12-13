@@ -1,0 +1,9 @@
+//
+// Prefix header for all source files of the 'XgridStatus' target in the 'XgridStatus' project.
+//
+
+#ifdef __OBJC__
+    #import <Foundation/Foundation.h>
+	#import <XgridFoundation/XgridFoundation.h>
+	#import "DebugLog.h"
+#endif
