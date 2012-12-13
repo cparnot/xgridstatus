@@ -8,7 +8,7 @@
 
 #import "PlistCategories.h"
 
-static NSString *tabs[11] = {
+static NSString *tabs[13] = {
 	@"",
 	@"\t",
 	@"\t\t",
@@ -19,7 +19,9 @@ static NSString *tabs[11] = {
 	@"\t\t\t\t\t\t\t",
 	@"\t\t\t\t\t\t\t\t",
 	@"\t\t\t\t\t\t\t\t\t",
-	@"\t\t\t\t\t\t\t\t\t\t"
+	@"\t\t\t\t\t\t\t\t\t\t",
+	@"\t\t\t\t\t\t\t\t\t\t\t",
+	@"\t\t\t\t\t\t\t\t\t\t\t\t"
 };
 
 @implementation NSObject (XgridStatusPlistCategory)
@@ -53,10 +55,10 @@ static NSString *tabs[11] = {
 	int i = 0;
 	while ( element = [e nextObject] ) {
 		NSString *elementString = [element xmlStringRepresentationWithIndent:indent+1];
-		[rep appendFormat:@"%@<%d>%@",tabs[indent],i,elementString];
+		[rep appendFormat:@"%@<array_item>%@",tabs[indent],elementString];
 		if ( [elementString rangeOfString:@"\n"].location != NSNotFound )
 			[rep appendString:tabs[indent]];
-		[rep appendFormat:@"</%d>\n",i];
+		[rep appendFormat:@"</array_item>\n"];
 		i++;
 	}
 	[rep appendString:@"\n"];
@@ -82,11 +84,13 @@ static NSString *tabs[11] = {
 	NSEnumerator *e = [self keyEnumerator];
 	id key;
 	while ( key = [e nextObject] ) {
-		NSString *elementString = [[self objectForKey:key]  xmlStringRepresentationWithIndent:indent+1];
-		[rep appendFormat:@"%@<%@>%@",tabs[indent],[key description],elementString];
+		NSString *elementString = [[self objectForKey:key]  xmlStringRepresentationWithIndent:indent+2];
+		[rep appendFormat:@"%@<dictionary_item>",tabs[indent]];
+		[rep appendFormat:@"%@<dictionary_key>%@</dictionary_key>", tabs[indent+1], [key description]];
+		[rep appendFormat:@"%@<dictionary_content>\n%@",tabs[indent+1],elementString];
 		if ( [elementString rangeOfString:@"\n"].location != NSNotFound )
-			[rep appendString:tabs[indent]];
-		[rep appendFormat:@"</%@>\n",[key description]];
+			[rep appendString:tabs[indent+1]];
+		[rep appendFormat:@"</dictionary_content>\n%@</dictionary_item>\n",tabs[indent]];
 	}
 	return rep;
 }

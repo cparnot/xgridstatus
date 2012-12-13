@@ -82,6 +82,8 @@ id nonNilValue(id inputValue)
 			processorCount[XGResourceStateWorking] += active;
 			float cpu = [agent totalCPUPower] / total;
 			workingMegaHertzProcessors += active * cpu;
+			if ( inactive > 0 )
+				processorCount[XGResourceStateAvailable] += inactive;
 		}
 		processorCount[state] += inactive;
 	}

@@ -6,9 +6,9 @@
 
 void print_usage ( )
 {
-	printf ("xgridstatus version 4.0b1\n");
+	printf ("xgridstatus version 4.0b3\n");
 	printf ("A command-line tool to generate Xgrid reports\n");
-	printf ("Created by Charles Parnot, August 2007\n");
+	printf ("Created by Charles Parnot, copyright 2005-2010, all rights reserved.\n");
 	printf ("\n");
 	printf ("usage: xgridstatus [ [-h hostname] [-p password | -k password] ]* [-r interval] [-o file] [-n xxx] -abcgjlmstvxAJT]\n");
 	printf ("\n");
