@@ -24,9 +24,13 @@ typedef enum {
 
 	//options
 	int verbose;
-	BOOL agentDetails;
-	BOOL gridDetails;
-	BOOL serverDetails;
+	BOOL serverList;
+	BOOL gridList;
+	BOOL agentList;
+	BOOL jobList;
+	BOOL agentStats;
+	BOOL jobStats;
+	BOOL timeStamp;
 	XgridStatusReportType reportType;
 	
 	//internals
@@ -39,11 +43,24 @@ typedef enum {
 
 - (void)start;
 
+- (BOOL)serverList;
+- (void)setServerList:(BOOL)value;
+- (BOOL)gridList;
+- (void)setGridList:(BOOL)value;
+- (BOOL)agentList;
+- (void)setAgentList:(BOOL)value;
+- (BOOL)jobList;
+- (void)setJobList:(BOOL)value;
+- (BOOL)agentStats;
+- (void)setAgentStats:(BOOL)value;
+- (BOOL)jobStats;
+- (void)setJobStats:(BOOL)value;
+- (BOOL)timeStamp;
+- (void)setTimeStamp:(BOOL)value;
+
 - (void)setVerbose:(BOOL)flag;
 - (BOOL)verbose;
-- (void)setAgentDetails:(BOOL)flag;
-- (void)setGridDetails:(BOOL)flag;
-- (void)setServerDetails:(BOOL)flag;
+
 - (void)setReportType:(XgridStatusReportType)type;
 
 //handling GEZServerHook notifications

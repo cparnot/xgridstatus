@@ -1,6 +1,15 @@
 version 2.5
 
-* Why report of dicconnetions??
+DONE
+* Error writing output file: only write it once
+* Add support for job report
+
+version 2.1
+
+DONE
+* Automatic reconnections
+* Better messages
+* Corrected bug which would result in Nan entry in the output, and freezing of the widget
 
 version 2.0
 

@@ -9,6 +9,14 @@
 #import "ResourceStateToStringTransformer.h"
 
 
+@implementation XGResource (XGResourceHumanReadableState)
+- (NSString *)humanReadableState
+{
+	return [[ResourceStateToStringTransformer sharedTransformer] transformedIntValue:[self state]];	
+}
+@end
+
+
 @implementation ResourceStateToStringTransformer
 
 static ResourceStateToStringTransformer *sharedTransformer = nil;

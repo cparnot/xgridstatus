@@ -1,16 +1,15 @@
 
+@interface XGResource (XGResourcePrivateForXgridStatus)
+- (NSString *)name;
+@end
 
 @interface XGController (XGControllerPrivateForXgridStatus)
-
-- (NSString *)name;
 - (NSArray *)agents;
 - (void)sendAgentListRequest;
-
 @end
 
 
 @interface XGGrid (XGGridPrivateForXgridStatus)
-
 - (NSString *)name;
 - (NSArray *)agents;
 - (void)sendAgentsRequest;
@@ -18,8 +17,8 @@
 - (void)sendRequestsAndSubscribeToNotifications;
 @end
 
+/*
 @protocol Agent
-
 - (NSString *)identifier;
 - (XGResourceState)state;
 - (NSString *)name;
@@ -28,8 +27,8 @@
 - (float)totalCPUPower;
 - (int)activeProcessorCount;
 - (int)totalProcessorCount;
-
 @end
+*/
 
 @interface XGAgent : XGResource
 {

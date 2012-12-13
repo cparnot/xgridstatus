@@ -10,7 +10,7 @@
 #import "GEZServerHook.h"
 #import "GEZGridHook.h"
 //#import "GEZAgentHook.h"
-#import "GridReport.h"
+#import "GEZGridHookReport.h"
 #import "PlistCategories.h"
 
 @implementation StatusReporter
@@ -71,19 +71,74 @@
 		return (BOOL)verbose;
 }
 
-- (void)setAgentDetails:(BOOL)flag
-{
-	agentDetails = flag;
+- (BOOL)serverList {
+    return serverList;
 }
 
-- (void)setGridDetails:(BOOL)flag
-{
-	gridDetails = flag;
+- (void)setServerList:(BOOL)value {
+    if (serverList != value) {
+        serverList = value;
+    }
 }
 
-- (void)setServerDetails:(BOOL)flag
-{
-	serverDetails = flag;
+- (BOOL)gridList {
+    return gridList;
+}
+
+- (void)setGridList:(BOOL)value {
+    if (gridList != value) {
+        gridList = value;
+    }
+}
+
+- (BOOL)agentList {
+    return agentList;
+}
+
+- (void)setAgentList:(BOOL)value {
+    if (agentList != value) {
+        agentList = value;
+    }
+}
+
+- (BOOL)jobList {
+    return jobList;
+}
+
+- (void)setJobList:(BOOL)value {
+    if (jobList != value) {
+        jobList = value;
+    }
+}
+
+- (BOOL)agentStats {
+    return agentStats;
+}
+
+- (void)setAgentStats:(BOOL)value {
+    if (agentStats != value) {
+        agentStats = value;
+    }
+}
+
+- (BOOL)jobStats {
+    return jobStats;
+}
+
+- (void)setJobStats:(BOOL)value {
+    if (jobStats != value) {
+        jobStats = value;
+    }
+}
+
+- (BOOL)timeStamp {
+    return timeStamp;
+}
+
+- (void)setTimeStamp:(BOOL)value {
+    if (timeStamp != value) {
+        timeStamp = value;
+    }
 }
 
 - (void)setReportType:(XgridStatusReportType)type
@@ -102,54 +157,59 @@
 
 #pragma mark *** Status construction ***
 
-NSNumber *floatSum(NSDictionary *dic1, NSDictionary *dic2, NSString *key)
+//sum of values in a dictionary are calculated using KVC and the @sum operator
+NSMutableDictionary *SumOfValuesInDictionaries(NSDictionary *dictionaries, NSArray *keys)
 {
-	return [NSNumber numberWithFloat:[[dic1 objectForKey:key] floatValue]+[[dic2 objectForKey:key] floatValue]];
-}
-
-NSNumber *intSum(NSDictionary *dic1, NSDictionary *dic2, NSString *key)
-{
-	return [NSNumber numberWithInt:[[dic1 objectForKey:key] intValue]+[[dic2 objectForKey:key] intValue]];
-}
-
-
-- (NSMutableDictionary *)addStatusDictionaries:(NSArray *)dictionaries
-{
-	NSMutableDictionary *sum = [NSMutableDictionary dictionaryWithCapacity:20];
-	NSMutableDictionary *agents = [NSMutableDictionary dictionary];
-	NSEnumerator *e = [dictionaries objectEnumerator];
-	NSDictionary *dict;
-	while ( dict = [e nextObject] ) {
-		
-		[sum setObject:floatSum(sum,dict,@"workingMegaHertz") forKey:@"workingMegaHertz"];
-		
-		[sum setObject:intSum(sum,dict,@"offlineAgentCount") forKey:@"offlineAgentCount"];
-		[sum setObject:intSum(sum,dict,@"onlineAgentCount") forKey:@"onlineAgentCount"];
-		[sum setObject:intSum(sum,dict,@"workingAgentCount") forKey:@"workingAgentCount"];
-		[sum setObject:intSum(sum,dict,@"availableAgentCount") forKey:@"availableAgentCount"];
-		[sum setObject:intSum(sum,dict,@"unavailableAgentCount") forKey:@"unavailableAgentCount"];
-		[sum setObject:intSum(sum,dict,@"totalAgentCount") forKey:@"totalAgentCount"];
-		
-		[sum setObject:intSum(sum,dict,@"onlineProcessorCount") forKey:@"onlineProcessorCount"];
-		[sum setObject:intSum(sum,dict,@"workingProcessorCount") forKey:@"workingProcessorCount"];
-		[sum setObject:intSum(sum,dict,@"availableProcessorCount") forKey:@"availableProcessorCount"];
-		[sum setObject:intSum(sum,dict,@"unavailableProcessorCount") forKey:@"unavailableProcessorCount"];
-		[sum setObject:intSum(sum,dict,@"offlineProcessorCount") forKey:@"offlineProcessorCount"];
-		
-		if ( [dict objectForKey:@"agents"] )
-			[agents addEntriesFromDictionary:[dict objectForKey:@"agents"]];
-
+	NSMutableDictionary *sum = [NSMutableDictionary dictionaryWithCapacity:[keys count]];
+	NSEnumerator *e = [keys objectEnumerator];
+	NSString *aKey;
+	while ( aKey = [e nextObject] ) {
+		NSString *keyPath = [NSString stringWithFormat:@"@sum.%@", aKey];
+		[sum setObject:[[dictionaries allValues] valueForKeyPath:keyPath] forKey:aKey];
 	}
+	return sum;
+}
 
-	float percentageWorking = 100.0 * [[sum objectForKey:@"workingAgentCount"] intValue] / [[sum objectForKey:@"totalAgentCount"] intValue];
-	[sum setObject:[NSNumber numberWithFloat:percentageWorking] forKey:@"workingAgentPercentage"];
+//agent stats need to be aggregated a special way
+- (NSMutableDictionary *)sumOfAgentStats:(NSDictionary *)dictionaries
+{
+	//adding all values except workingAgentPercentage
+	NSMutableDictionary *sum = SumOfValuesInDictionaries(dictionaries, [NSArray arrayWithObjects:@"workingMegaHertz", @"offlineAgentCount", @"onlineAgentCount", @"workingAgentCount", @"availableAgentCount", @"unavailableAgentCount", @"totalAgentCount", @"onlineProcessorCount", @"workingProcessorCount", @"availableProcessorCount", @"unavailableProcessorCount", @"offlineProcessorCount", nil]);
 	
-	if ( [agents count] > 0 )
-		[sum setObject:agents forKey:@"agents"];	
+	//workingAgentPercentage is a special case
+	double percentageWorking = 0.0;
+	int totalAgentCount = [[sum objectForKey:@"totalAgentCount"] intValue];
+	if ( totalAgentCount != 0 )
+		percentageWorking = 100.0 * [[sum objectForKey:@"workingAgentCount"] intValue] / totalAgentCount;
+	[sum setObject:[NSNumber numberWithFloat:percentageWorking] forKey:@"workingAgentPercentage"];
 	
 	return sum;
 }
 
+//job stats need to be aggregated a special way
+- (NSMutableDictionary *)sumOfJobStats:(NSDictionary *)dictionaries
+{
+	return SumOfValuesInDictionaries(dictionaries, [NSArray arrayWithObjects:@"totalJobCount", @"workingJobCount", @"pendingJobCount", @"startingJobCount", @"runningJobCount", @"suspendedJobCount", @"canceledJobCount", @"failedJobCount", @"finishedJobCount", nil]);
+}
+
+//logic to put together several reports that include all kind of agent and job info
+- (NSMutableDictionary *)aggregateReports:(NSDictionary *)dictionaries keepChildren:(BOOL)keepChildren childrenKey:(NSString *)childrenKey
+{
+	NSMutableDictionary *aggregate = [NSMutableDictionary dictionary];
+	if ( agentStats ) [aggregate addEntriesFromDictionary:[self sumOfAgentStats:dictionaries]];
+	if ( jobStats ) [aggregate addEntriesFromDictionary:[self sumOfJobStats:dictionaries]];
+	if ( keepChildren )
+		[aggregate setObject:dictionaries forKey:childrenKey];
+	//agent and job lists should only be added if not already in the grid list
+	else  {
+		if ( agentList ) [aggregate setValue:[[dictionaries allValues] valueForKeyPath:@"@unionOfArrays.agents"] forKey:@"agents"];
+		if ( jobList ) [aggregate setValue:[[dictionaries allValues] valueForKeyPath:@"@unionOfArrays.jobs"] forKey:@"jobs"];
+	}	
+	return aggregate;
+}
+
+
+//the dictionary is actually created when calling 'updateStatusDictionary'
 - (NSDictionary *)statusDictionary
 {
 	return currentStatusDictionary;
@@ -170,33 +230,38 @@ NSNumber *intSum(NSDictionary *dic1, NSDictionary *dic2, NSString *key)
 	GEZServerHook *aServer;
 	while ( aServer = [e nextObject] ) {
 		
-		NSMutableDictionary *serverDictionary = nil;
+		//set to nil, so that if nothing comes out of this, it won't be used (see later in the code)
+		NSMutableDictionary *oneServerReport = nil;
 
 		//if the server is loaded, it is up to date and we can get the correct information from it
 		if ( [aServer isLoaded] ) {
-			//printf("    Server %s loaded\n",[[aServer address] UTF8String]);
+			
+			//get report for individual grids
 			NSArray *grids = [aServer grids];
-			//this dictionary will contain a list of subdictionaries, one for each grid of the server
 			NSMutableDictionary *gridReports = [NSMutableDictionary dictionaryWithCapacity:[grids count]];
 			NSEnumerator *ee = [grids objectEnumerator];
 			GEZGridHook *aGrid;
-			while ( aGrid = [ee nextObject] )
-				[gridReports setObject:[aGrid reportWithAgentList:agentDetails] forKey:[[aGrid xgridGrid] name]];
-			serverDictionary = [self addStatusDictionaries:[gridReports allValues]];
-			if ( gridDetails ) {
-				[serverDictionary setObject:gridReports forKey:@"grids"];
-				//if agents are listed in the grids, no need for them in the controller details
-				if ( agentDetails && serverDetails )
-					[serverDictionary removeObjectForKey:@"agents"];
+			while ( aGrid = [ee nextObject] ) {
+				NSMutableDictionary *oneGridReport = [NSMutableDictionary dictionaryWithDictionary:[aGrid gridInfo]];
+				if ( agentList ) [oneGridReport setObject:[aGrid agentList] forKey:@"agents"];
+				if ( jobList ) [oneGridReport setObject:[aGrid jobList] forKey:@"jobs"];
+				if ( agentStats ) [oneGridReport addEntriesFromDictionary:[aGrid agentStats]];
+				if ( jobStats) [oneGridReport addEntriesFromDictionary:[aGrid jobStats]];
+				[gridReports setObject:oneGridReport forKey:[[aGrid xgridGrid] name]];
 			}
 			
+			//aggregate results for the whole server
+			oneServerReport = [self aggregateReports:gridReports keepChildren:gridList childrenKey:@"grids"];
+				
 		//if the server is not loaded and thus does not have valid information, we use previous values
 		} else {
 			//printf("    Server %s not loaded\n",[[aServer address] UTF8String]);
-			serverDictionary = [lastServerReports objectForKey:[aServer address]];
+			oneServerReport = [lastServerReports objectForKey:[aServer address]];
 		}
-		if ( serverDictionary != nil )
-			[serverReports setObject:serverDictionary forKey:[aServer address]];
+		
+		//add the ser
+		if ( oneServerReport != nil )
+			[serverReports setObject:oneServerReport forKey:[aServer address]];
 	}
 	
 	//keep the info for the next time, in case some servers get disconnected
@@ -205,29 +270,29 @@ NSNumber *intSum(NSDictionary *dic1, NSDictionary *dic2, NSString *key)
 	
 	
 	//final dictionary could be just the aggregated result or could contain details for each controller
-	NSMutableDictionary *finalDictionary = [self addStatusDictionaries:[serverReports allValues]];
-	if ( serverDetails ) {
-		[finalDictionary setObject:serverReports forKey:@"controllers"];
-		//agents will be listed for each individual controller, no need to aggregate
-		[finalDictionary removeObjectForKey:@"agents"];
-	}
+	NSMutableDictionary *finalDictionary = [self aggregateReports:serverReports keepChildren:serverList childrenKey:@"controllers"];
 	
 	//add time info
-	NSDate *now = [NSDate date];
-	[finalDictionary addEntriesFromDictionary:[NSDictionary dictionaryWithObjectsAndKeys:
-		[now dateWithCalendarFormat:@"%Y" timeZone:nil],@"Year",
-		[now dateWithCalendarFormat:@"%m" timeZone:nil],@"MonthIndex",
-		[now dateWithCalendarFormat:@"%B" timeZone:nil],@"MonthName",
-		[now dateWithCalendarFormat:@"%b" timeZone:nil],@"MonthNameShort",
-		[now dateWithCalendarFormat:@"%e" timeZone:nil],@"Day",
-		[now dateWithCalendarFormat:@"%H" timeZone:nil],@"Hours",
-		[now dateWithCalendarFormat:@"%M" timeZone:nil],@"Minutes",
-		[now dateWithCalendarFormat:@"%S" timeZone:nil],@"Seconds",
-		[now dateWithCalendarFormat:@"%Z" timeZone:nil],@"TimeZone",
-		nil]];
+	if ( timeStamp ) {
+		NSDate *now = [NSDate date];
+		[finalDictionary addEntriesFromDictionary:[NSDictionary dictionaryWithObjectsAndKeys:
+			[now dateWithCalendarFormat:@"%Y" timeZone:nil],@"Year",
+			[now dateWithCalendarFormat:@"%m" timeZone:nil],@"MonthIndex",
+			[now dateWithCalendarFormat:@"%B" timeZone:nil],@"MonthName",
+			[now dateWithCalendarFormat:@"%b" timeZone:nil],@"MonthNameShort",
+			[now dateWithCalendarFormat:@"%e" timeZone:nil],@"Day",
+			[now dateWithCalendarFormat:@"%H" timeZone:nil],@"Hours",
+			[now dateWithCalendarFormat:@"%M" timeZone:nil],@"Minutes",
+			[now dateWithCalendarFormat:@"%S" timeZone:nil],@"Seconds",
+			[now dateWithCalendarFormat:@"%Z" timeZone:nil],@"TimeZone",
+			nil]];
+	}
 	
+	//keep the current report in memory
 	[currentStatusDictionary release];
 	currentStatusDictionary = [finalDictionary copy];
+	
+	//we did it!!!
 	return YES;
 }
 
@@ -398,9 +463,7 @@ NSNumber *intSum(NSDictionary *dic1, NSDictionary *dic2, NSString *key)
 		int countGrids = [[aServer grids] count];
 		NSArray *allAgents = [aServer valueForKeyPath:@"grids.@distinctUnionOfArrays.xgridGrid.agents"];
 		int countAgents = [allAgents count];
-		if ( [aServer isLoaded] )
-			printf("In progress: Controller '%s' loaded, %d grids, %d agents\n", address, countGrids, countAgents);
-		else if ( [aServer isUpdated] ) {
+		if ( [aServer isUpdated] ) {
 			int countUpdatedGrids = [[aServer valueForKeyPath:@"grids.@sum.isUpdated"] intValue];
 			//if all grids are updated, we know for sure the number of agents
 			if ( countUpdatedGrids == countGrids ) {

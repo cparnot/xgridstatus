@@ -17,3 +17,8 @@
 - (id)transformedIntValue:(int)intValue;
 
 @end
+
+
+@interface XGResource (XGResourceHumanReadableState)
+- (NSString *)humanReadableState;
+@end
