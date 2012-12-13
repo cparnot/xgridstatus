@@ -15,6 +15,7 @@ The features include:
 
 	xgridstatus [ [-h hostname] [-p password | -k password] ]* [-r interval] [-o file] [-abcgjlstvxAJT]
 
+
 * Connection options (note that you can include several -h options, to connect to several controllers)
 
 	    -h hostname  Bonjour name or address of an xgrid controller
