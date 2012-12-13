@@ -7,54 +7,36 @@
 //
 
 #import "StatusReporter.h"
-#import "XgridPrivate.h"
+#import "GEZServerHook.h"
+#import "GEZGridHook.h"
+#import "GEZAgentHook.h"
+#import "GridReport.h"
+#import "PlistCategories.h"
+
+//used to notify the user of progress when things go slowly
+#define PROGRESS_NOTIFICATION_INTERVAL 10.0
 
 @implementation StatusReporter
 
 #pragma mark *** Initializations ***
 
-- (id)initWithXgridController:(NSString *)hostname password:(NSString *)password reportInterval:(double)interval output:(NSString *)path
+- (id)initWithServers:(NSArray *)serverArray reportInterval:(double)interval output:(NSString *)path
 {
 	self = [super init];
 	if ( self != nil ) {
-		xgridControllerHostname = [hostname retain];
-		xgridControllerPassword = [password retain];
-		reportInterval = (interval>0)?interval:60;
+		servers = [serverArray copy];
+		reportInterval = interval;
 		outputFilePath = [[path stringByStandardizingPath] retain];
-		
-		BOOL isRemoteHost = ( [hostname rangeOfString:@"."].location != NSNotFound );
-		if ( [hostname isEqualToString:@"localhost"] )
-			isRemoteHost = YES;
-		BOOL usePassword = ( [password length] > 0 );
-		if ( usePassword && isRemoteHost )
-			connectionSelectors = [NSArray arrayWithObjects:@"5",@"2",@"4",@"6",@"1",@"3",nil];
-		else if ( usePassword && !isRemoteHost )
-			connectionSelectors = [NSArray arrayWithObjects:@"2",@"5",@"1",@"3",@"4",@"6",nil];
-		else if ( !usePassword && isRemoteHost )
-			connectionSelectors = [NSArray arrayWithObjects:@"4",@"6",@"1",@"3",nil];
-		else if ( !usePassword && !isRemoteHost )
-			connectionSelectors = [NSArray arrayWithObjects:@"1",@"3",@"4",@"6",nil];
-		else
-			connectionSelectors = [NSArray array];
-		[connectionSelectors retain];
-		selectorEnumerator = [[connectionSelectors objectEnumerator] retain];
-		
-		xgridController = nil;
-		xgridConnection = nil;
+		verbose = 2;
+		reportType = XgridStatusReportTypeOldPlist;
 	}
 	return self;
 }
 
 - (void)dealloc
 {
-	[xgridControllerHostname release];
-	[xgridControllerPassword release];
+	[servers release];
 	[outputFilePath release];
-	[xgridConnection release];
-	[xgridController release];
-	[selectorEnumerator release];
-	[connectionSelectors release];
-	
 	[super dealloc];
 }
 
@@ -65,77 +47,202 @@
 }
 
 
+#pragma mark *** Accessors ***
+
+- (void)setVerbose:(BOOL)flag
+{
+	verbose = (int)flag;
+}
+
+- (BOOL)verbose
+{
+	if ( verbose == 2 )
+		return ( reportInterval > 0 || outputFilePath != nil );
+	else
+		return (BOOL)verbose;
+}
+
+- (void)setAgentDetails:(BOOL)flag
+{
+	agentDetails = flag;
+}
+
+- (void)setGridDetails:(BOOL)flag
+{
+	gridDetails = flag;
+}
+
+- (void)setServerDetails:(BOOL)flag
+{
+	serverDetails = flag;
+}
+
+- (void)setReportType:(XgridStatusReportType)type
+{
+	reportType = type;
+}
+
+
+- (int)countServerLoaded
+{
+	int countServerLoaded = 0;
+	NSEnumerator *e = [servers objectEnumerator];
+	GEZServerHook *aServer;
+	while ( aServer = [e nextObject] )
+		if ( [aServer isLoaded] )
+			countServerLoaded++;
+	return countServerLoaded;
+}
+
+- (BOOL)allServersLoaded
+{
+	return ( [self countServerLoaded] >= [servers count] );
+}
+
+- (int)countAgents
+{
+	int countAgents = 0;
+	NSEnumerator *e = [servers objectEnumerator];
+	GEZServerHook *aServer;
+	while ( aServer = [e nextObject] ) {
+		NSEnumerator *ee = [[aServer grids] objectEnumerator];
+		GEZGridHook *aGrid;
+		while ( aGrid = [ee nextObject] )
+			countAgents += [[[aGrid xgridGrid] agents] count];
+	}
+	return countAgents;
+}
+
+- (int)countAgentLoaded
+{
+	int countAgentLoaded = 0;
+	NSEnumerator *e = [servers objectEnumerator];
+	GEZServerHook *aServer;
+	while ( aServer = [e nextObject] ) {
+		NSEnumerator *ee = [[aServer grids] objectEnumerator];
+		GEZGridHook *aGrid;
+		while ( aGrid = [ee nextObject] ) {
+			NSEnumerator *eee = [[aGrid agentHooks] objectEnumerator];
+			GEZAgentHook *anAgent;
+			while ( anAgent = [eee nextObject] )
+				if ( [anAgent isSynced] )
+					countAgentLoaded ++;
+		}
+	}
+	return countAgentLoaded;
+}
+
+- (BOOL)allAgentsLoaded
+{
+	BOOL allReady = YES;
+	NSEnumerator *e1 = [servers objectEnumerator];
+	GEZServerHook *aServer;
+	while ( aServer = [e1 nextObject] ) {
+		NSArray *grids = [aServer grids];
+		if ( [grids count] == 0 ) {
+			allReady = NO;
+			[e1 allObjects];
+		}
+		NSEnumerator *e2 = [grids objectEnumerator];
+		GEZGridHook *aGrid;
+		while ( aGrid = [e2 nextObject]) {
+			if ( [aGrid agentsLoaded] == NO ) {
+				allReady = NO;
+				[e2 allObjects];
+				[e1 allObjects];
+			}
+		}
+	}
+	return allReady;
+}
+
+
 #pragma mark *** Status construction ***
+
+NSNumber *floatSum(NSDictionary *dic1, NSDictionary *dic2, NSString *key)
+{
+	return [NSNumber numberWithFloat:[[dic1 objectForKey:key] floatValue]+[[dic2 objectForKey:key] floatValue]];
+}
+
+NSNumber *intSum(NSDictionary *dic1, NSDictionary *dic2, NSString *key)
+{
+	return [NSNumber numberWithInt:[[dic1 objectForKey:key] intValue]+[[dic2 objectForKey:key] intValue]];
+}
+
+
+- (NSMutableDictionary *)addStatusDictionaries:(NSArray *)dictionaries
+{
+	NSMutableDictionary *sum = [NSMutableDictionary dictionaryWithCapacity:20];
+	NSMutableDictionary *agents = [NSMutableDictionary dictionary];
+	NSEnumerator *e = [dictionaries objectEnumerator];
+	NSDictionary *dict;
+	while ( dict = [e nextObject] ) {
+		
+		[sum setObject:floatSum(sum,dict,@"workingMegaHertz") forKey:@"workingMegaHertz"];
+		
+		[sum setObject:intSum(sum,dict,@"offlineAgentCount") forKey:@"offlineAgentCount"];
+		[sum setObject:intSum(sum,dict,@"onlineAgentCount") forKey:@"onlineAgentCount"];
+		[sum setObject:intSum(sum,dict,@"workingAgentCount") forKey:@"workingAgentCount"];
+		[sum setObject:intSum(sum,dict,@"availableAgentCount") forKey:@"availableAgentCount"];
+		[sum setObject:intSum(sum,dict,@"unavailableAgentCount") forKey:@"unavailableAgentCount"];
+		[sum setObject:intSum(sum,dict,@"totalAgentCount") forKey:@"totalAgentCount"];
+		
+		[sum setObject:intSum(sum,dict,@"onlineProcessorCount") forKey:@"onlineProcessorCount"];
+		[sum setObject:intSum(sum,dict,@"workingProcessorCount") forKey:@"workingProcessorCount"];
+		[sum setObject:intSum(sum,dict,@"availableProcessorCount") forKey:@"availableProcessorCount"];
+		[sum setObject:intSum(sum,dict,@"unavailableProcessorCount") forKey:@"unavailableProcessorCount"];
+		[sum setObject:intSum(sum,dict,@"offlineProcessorCount") forKey:@"offlineProcessorCount"];
+		
+		if ( [dict objectForKey:@"agents"] )
+			[agents addEntriesFromDictionary:[dict objectForKey:@"agents"]];
+
+	}
+
+	float percentageWorking = 100.0 * [[sum objectForKey:@"workingAgentCount"] intValue] / [[sum objectForKey:@"totalAgentCount"] intValue];
+	[sum setObject:[NSNumber numberWithFloat:percentageWorking] forKey:@"workingAgentPercentage"];
+	
+	if ( [agents count] > 0 )
+		[sum setObject:agents forKey:@"agents"];	
+	
+	return sum;
+}
+
 
 - (NSDictionary *)statusDictionary
 {
-	//get the information about agents
-	float totalMegaHertz = 0;
-	float workingMegaHertzAgents = 0;
-	float workingMegaHertzProcessors = 0;
-	int onlineProcessorCount = 0;
-	int agentCount[6] = { 0, 0, 0, 0, 0, 0 };
-	int processorCount[7] = { 0, 0, 0, 0, 0, 0, 0 };
-	NSArray *agents = [xgridController agents];
-	NSEnumerator *e = [agents objectEnumerator];
-	id <Agent> agent;
-	while ( agent = [e nextObject] ) {
-		
-		//the CPUPower is in MegaHertz
-		totalMegaHertz += [agent totalCPUPower];
-		workingMegaHertzAgents += [agent activeCPUPower];
-		
-		//keep trak of the number of agents in each state
-		XGResourceState state = [agent state];
-		agentCount[state] ++;
-		
-		//for the processors, it is more subtle
-		//I use onlineProcessorCount to count TOTAL number of processors
-		int total = [agent totalProcessorCount];
-		int active = [agent activeProcessorCount];
-		int inactive = total - active;
-		onlineProcessorCount += total;
-		if ( active > 0 ) {
-			processorCount[XGResourceStateWorking] += active;
-			float cpu = [agent totalCPUPower] / total;
-			workingMegaHertzProcessors += active * cpu;
+	NSMutableDictionary *serverReports = [NSMutableDictionary dictionaryWithCapacity:[servers count]];
+	
+	//level 1 and level 2 dictionaries = grids and servers
+	NSEnumerator *e = [servers objectEnumerator];
+	GEZServerHook *aServer;
+	while ( aServer = [e nextObject] ) {
+		NSArray *grids = [aServer grids];
+		NSMutableDictionary *gridReports = [NSMutableDictionary dictionaryWithCapacity:[grids count]];
+		NSEnumerator *ee = [grids objectEnumerator];
+		GEZGridHook *aGrid;
+		while ( aGrid = [ee nextObject] )
+			[gridReports setObject:[aGrid reportWithAgentList:agentDetails] forKey:[[aGrid xgridGrid] name]];
+		NSMutableDictionary *serverDictionary = [self addStatusDictionaries:[gridReports allValues]];
+		if ( gridDetails ) {
+			[serverDictionary setObject:gridReports forKey:@"grids"];
+			//if agents are listed in the grids, no need for them in the controller details
+			if ( agentDetails && serverDetails )
+				[serverDictionary removeObjectForKey:@"agents"];
 		}
-		processorCount[state] += inactive;
-		
-		//printf ( "agent '%s' at IP '%s' : %d\n", [[agent name] UTF8String], [[agent address] UTF8String], [agent state] );
+		[serverReports setObject:serverDictionary forKey:[aServer address]];
 	}
 	
-	//get the working CPU
-	float workingMegaHertzJobs = 0;
-	XGGrid *grid;
-	XGJob *job;
-	NSEnumerator *ee = [[xgridController grids] objectEnumerator];
-	while ( grid = [ee nextObject] ) {
-		NSEnumerator *eee = [[grid jobs] objectEnumerator];
-		while ( job = [eee nextObject] )
-			workingMegaHertzJobs += [job activeCPUPower];
+	//final dictionary could be just the aggregated result or could contain details for each controller and/or grid
+	NSMutableDictionary *finalDictionary = [self addStatusDictionaries:[serverReports allValues]];
+	if ( serverDetails ) {
+		[finalDictionary setObject:serverReports forKey:@"controllers"];
+		//agents will be listed for each individual controller, no need to aggregate
+		[finalDictionary removeObjectForKey:@"agents"];
 	}
 	
+	//add time info
 	NSDate *now = [NSDate date];
-	NSDictionary *statusDictionary = [NSDictionary dictionaryWithObjectsAndKeys:
-		[NSNumber numberWithFloat:workingMegaHertzProcessors],@"workingMegaHertz",
-	
-		[NSNumber numberWithInt:agentCount[XGResourceStateOffline]],@"offlineAgentCount",
-		[NSNumber numberWithInt:[agents count]-agentCount[XGResourceStateOffline]],@"onlineAgentCount",
-		[NSNumber numberWithInt:agentCount[XGResourceStateWorking]],@"workingAgentCount",
-		[NSNumber numberWithInt:agentCount[XGResourceStateAvailable]],@"availableAgentCount",
-		[NSNumber numberWithInt:agentCount[XGResourceStateUnavailable]],@"unavailableAgentCount",
-		[NSNumber numberWithInt:[agents count]],@"totalAgentCount",
-
-		
-		[NSNumber numberWithFloat:100.0 * agentCount[XGResourceStateWorking] / [agents count]],@"workingAgentPercentage",
-
-		[NSNumber numberWithInt:onlineProcessorCount],@"onlineProcessorCount",
-		[NSNumber numberWithInt:processorCount[XGResourceStateWorking]],@"workingProcessorCount",
-		[NSNumber numberWithInt:processorCount[XGResourceStateAvailable]],@"availableProcessorCount",
-		[NSNumber numberWithInt:processorCount[XGResourceStateUnavailable]],@"unavailableProcessorCount",
-		[NSNumber numberWithInt:onlineProcessorCount - processorCount[XGResourceStateWorking] - processorCount[XGResourceStateAvailable] - processorCount[XGResourceStateUnavailable]], @"offlineProcessorCount",
-
+	[finalDictionary addEntriesFromDictionary:[NSDictionary dictionaryWithObjectsAndKeys:
 		[now dateWithCalendarFormat:@"%Y" timeZone:nil],@"Year",
 		[now dateWithCalendarFormat:@"%m" timeZone:nil],@"MonthIndex",
 		[now dateWithCalendarFormat:@"%B" timeZone:nil],@"MonthName",
@@ -145,77 +252,109 @@
 		[now dateWithCalendarFormat:@"%M" timeZone:nil],@"Minutes",
 		[now dateWithCalendarFormat:@"%S" timeZone:nil],@"Seconds",
 		[now dateWithCalendarFormat:@"%Z" timeZone:nil],@"TimeZone",
-		nil];
-
-#ifdef DEBUG
-	NSMutableDictionary *moreStuff = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-		[NSNumber numberWithFloat:workingMegaHertzJobs],@"workingMegaHertzJobs",
-		[NSNumber numberWithFloat:workingMegaHertzAgents],@"workingMegaHertzAgents",
-		[NSNumber numberWithFloat:workingMegaHertzProcessors],@"workingMegaHertzProcessors",
-		[NSNumber numberWithFloat:totalMegaHertz],@"totalMegaHertz",
-
-
-		[NSNumber numberWithInt:processorCount[XGResourceStateOffline]],@"offlineStateProcessorCount",
-		nil];
-	[moreStuff addEntriesFromDictionary:statusDictionary];
-	statusDictionary = [NSDictionary dictionaryWithDictionary:moreStuff];
-#endif
+		nil]];
 	
-	return statusDictionary;
+	return finalDictionary;
 }
+
+- (NSData *)statusBinaryData
+{
+	NSString *error = nil;
+	NSData *plistData = [NSPropertyListSerialization dataFromPropertyList:[self statusDictionary] format:NSPropertyListBinaryFormat_v1_0 errorDescription:&error];
+	if ( error != nil ) {
+		printf("could not generate a report in binary format from the data because of error:\n%s\n",[error UTF8String]);
+		return [NSData data];
+	}
+	return plistData;
+}
+
+- (NSString *)statusBinaryString
+{
+	return [[self statusBinaryData] description];
+}
+
+
+- (NSData *)statusPlistData
+{
+	NSString *error = nil;
+	NSData *plistData = [NSPropertyListSerialization dataFromPropertyList:[self statusDictionary] format:NSPropertyListXMLFormat_v1_0 errorDescription:&error];
+	if ( error != nil ) {
+		printf("could not generate a report in plist format from the data because of error:\n%s\n",[error UTF8String]);
+		return [NSData data];
+	}
+	return plistData;
+}
+
+- (NSString *)statusPlistString
+{
+	return [[[NSString alloc] initWithData:[self statusPlistData] encoding:NSUTF8StringEncoding] autorelease];
+}
+
 
 - (NSString *)statusXMLString
 {
-	NSDictionary *statusDictionary = [self statusDictionary];
-	NSArray *keys = [[statusDictionary allKeys] sortedArrayUsingSelector:@selector(compare:)];
-	NSMutableArray *strings = [NSMutableArray arrayWithCapacity:[keys count]];
-	NSEnumerator *e = [keys objectEnumerator];
-	NSString *key;
-	while ( key = [e nextObject] )
-		[strings addObject:[NSString stringWithFormat:@"<%@>%@</%@>", [key description], [[statusDictionary objectForKey:key] description], [key description]]];
-	return [NSString stringWithFormat:@"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<gauge>\n%@\n</gauge>\n",
-		[strings componentsJoinedByString:@"\n"]];
+	return [NSString stringWithFormat:@"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<gauge>%@</gauge>\n",
+		[[self statusDictionary] xmlStringRepresentation]];
 }
+
+- (NSData *)statusXMLData
+{
+	return [[self statusXMLString] dataUsingEncoding:NSUTF8StringEncoding allowLossyConversion:YES];
+}
+
 
 - (NSString *)statusSimpleString
 {
-	NSDictionary *statusDictionary = [self statusDictionary];
-	NSArray *keys=[[statusDictionary allKeys] sortedArrayUsingSelector:@selector(compare:)];
-	NSMutableArray *strings=[NSMutableArray arrayWithCapacity:[keys count]];
-	NSEnumerator *e=[keys objectEnumerator];
-	NSString *key;
-	while (key=[e nextObject])
-		[strings addObject:[NSString stringWithFormat:@"%@ = %@", [key description], [[statusDictionary objectForKey:key] description]]];
-	return [strings componentsJoinedByString:@"\n"];
+	return [[self statusDictionary] description];
+}
+
+- (NSData *)statusSimpleData
+{
+	return [[self statusSimpleString] dataUsingEncoding:NSUTF8StringEncoding allowLossyConversion:YES];
+}
+
+- (NSString *)statusString
+{
+	if ( reportType == XgridStatusReportTypeOldPlist )
+		return [self statusSimpleString];
+	else if ( reportType == XgridStatusReportTypePlist )
+		return [self statusPlistString];
+	else if ( reportType == XgridStatusReportTypeXML )
+		return [self statusXMLString];
+	else if ( reportType == XgridStatusReportTypeBinary )
+		return [self statusBinaryString];
+	else
+		return [NSString string];
+}
+
+- (NSData *)statusData
+{
+	if ( reportType == XgridStatusReportTypeOldPlist )
+		return [self statusSimpleData];
+	else if ( reportType == XgridStatusReportTypePlist )
+		return [self statusPlistData];
+	else if ( reportType == XgridStatusReportTypeXML )
+		return [self statusXMLData];
+	else if ( reportType == XgridStatusReportTypeBinary )
+		return [self statusBinaryData];
+	else
+		return [NSData data];
 }
 
 - (void)report
 {
 	DLog(NSStringFromClass([self class]),10,@"<%@:%p> %s",[self class],self,_cmd);
 	
-	//printf ("Connection state = %d\n", [xgridConnection state] );
-	//printf ("Controller state = %d\n", [xgridController state] );
-	
-	if ( selectorEnumerator != nil )
-		return;
-	
-	XGResourceState connectionState = [xgridConnection state];
-	XGResourceState controllerState = [xgridController state];
-	BOOL connectionOK =  connectionState == XGResourceStateConnecting ||  connectionState == XGResourceStateAvailable;
-	BOOL controllerOK =  controllerState == XGResourceStateConnecting ||  controllerState == XGResourceStateAvailable;
-	if ( !connectionOK )
-		[self raiseConnectionError];
-	if ( !controllerOK )
-		;
-	
 	if ( outputFilePath == nil ) {
-		printf ( "%s\n", [[self statusSimpleString] UTF8String] );
+		printf ( "%s\n", [[self statusString] UTF8String] );
 	} else {
-		NSString *xmlString = [self statusXMLString];
-		NSData *xmlData = [xmlString dataUsingEncoding:NSUTF8StringEncoding allowLossyConversion:YES];
-		if ( [xmlData writeToFile:outputFilePath atomically:YES] ==NO )
+		NSData *statusData = [self statusData];
+		if ( [statusData writeToFile:outputFilePath atomically:YES] ==NO )
 			printf ( "Error writing output file.\n" );
 	}
+	
+	if ( reportInterval <= 0.0 )
+		exit (0);
 }
 
 - (void)reportWithTimer:(NSTimer *)aTimer
@@ -224,230 +363,97 @@
 	[self report];
 }
 
-#pragma mark *** Connection ***
-
-//first attempt to connect
-//trying to use a Bonjour connection without password
-- (void)connect1
-{
-	DLog(NSStringFromClass([self class]),10,@"<%@:%p> %s",[self class],self,_cmd);
-	printf ("Connecting to Bonjour controller '%s' without password\n",[xgridControllerHostname UTF8String]);
-
-	//release the old XGConnection
-	[xgridConnection setDelegate:nil];
-	[xgridConnection release];
-	
-	//create a new XGConnection with a NSNetService
-	NSNetService *netService = [[NSNetService alloc] initWithDomain:@"local."
-															   type:@"_xgrid._tcp."
-															   name:xgridControllerHostname];
-	xgridConnection = [[XGConnection alloc] initWithNetService:netService];
-	[netService release];
-	
-	//set the delegate and authenticator... and go!!
-	[xgridConnection setDelegate:self];
-	[xgridConnection setAuthenticator:nil];
-	[xgridConnection open];
-}
-
-//second attempt to connect
-//trying to use a Bonjour connection with a password
-- (void)connect2
-{
-	DLog(NSStringFromClass([self class]),10,@"<%@:%p> %s",[self class],self,_cmd);
-	printf ("Connecting to Bonjour controller '%s' with the provided password\n",[xgridControllerHostname UTF8String]);
-
-	//release the old XGConnection
-	[xgridConnection setDelegate:nil];
-	[xgridConnection release];
-	
-	//create a new XGConnection with a NSNetService
-	NSNetService *netService = [[NSNetService alloc] initWithDomain:@"local."
-															   type:@"_xgrid._tcp."
-															   name:xgridControllerHostname];
-	xgridConnection = [[XGConnection alloc] initWithNetService:netService];
-	[netService release];
-	
-	//set the authenticator
-	XGTwoWayRandomAuthenticator *authenticator = [[XGTwoWayRandomAuthenticator alloc] init];
-	[authenticator setUsername:@"one-xgrid-client"];
-	[authenticator setPassword:xgridControllerPassword];
-	[xgridConnection setAuthenticator:authenticator];
-	[authenticator release];
-
-	//go!!
-	[xgridConnection setDelegate:self];
-	[xgridConnection open];
-}
-
-//third attempt to connect
-//trying to use a Bonjour connection with Kerberos
-- (void)connect3
-{
-	DLog(NSStringFromClass([self class]),10,@"<%@:%p> %s",[self class],self,_cmd);
-	printf ("Connecting to Bonjour controller '%s' using single sign-on credentials\n",[xgridControllerHostname UTF8String]);
-
-	//release the old XGConnection
-	[xgridConnection setDelegate:nil];
-	[xgridConnection release];
-	
-	//create a new XGConnection with a NSNetService
-	NSNetService *netService = [[NSNetService alloc] initWithDomain:@"local."
-															   type:@"_xgrid._tcp."
-															   name:xgridControllerHostname];
-	xgridConnection = [[XGConnection alloc] initWithNetService:netService];
-	[netService release];
-	
-	//set the authenticator
-	XGGSSAuthenticator *authenticator = [[XGGSSAuthenticator alloc] init];
-	NSString *servicePrincipal = [xgridConnection servicePrincipal];
-	if (servicePrincipal == nil)
-		servicePrincipal=[NSString stringWithFormat:@"xgrid/%@", [xgridConnection name]];		
-	[authenticator setServicePrincipal:servicePrincipal];
-	[xgridConnection setAuthenticator:authenticator];
-	[authenticator release];
-	
-	//go!!
-	[xgridConnection setDelegate:self];
-	[xgridConnection open];
-}
-
-//fourth attempt to connect
-//trying to use a remote connection without a password
-- (void)connect4
-{
-	DLog(NSStringFromClass([self class]),10,@"<%@:%p> %s",[self class],self,_cmd);
-	printf ("Connecting to remote controller at address '%s' without password\n",[xgridControllerHostname UTF8String]);
-
-	//release the old XGConnection
-	[xgridConnection setDelegate:nil];
-	[xgridConnection release];
-	
-	//create a new XGConnection
-	xgridConnection = [[XGConnection alloc] initWithHostname:xgridControllerHostname portnumber:0];
-	
-	//set the authenticator
-	[xgridConnection setAuthenticator:nil];
-	
-	//go!!
-	[xgridConnection setDelegate:self];
-	[xgridConnection open];
-}
-
-//fifth attempt to connect
-//trying to use a remote connection with a password
-- (void)connect5
-{
-	DLog(NSStringFromClass([self class]),10,@"<%@:%p> %s",[self class],self,_cmd);
-	printf ("Connecting to remote controller at address '%s' with the provided password\n",[xgridControllerHostname UTF8String]);
-
-	//release the old XGConnection
-	[xgridConnection setDelegate:nil];
-	[xgridConnection release];
-	
-	//create a new XGConnection
-	xgridConnection = [[XGConnection alloc] initWithHostname:xgridControllerHostname portnumber:0];
-	
-	//set the authenticator
-	XGTwoWayRandomAuthenticator *authenticator = [[XGTwoWayRandomAuthenticator alloc] init];
-	[authenticator setUsername:@"one-xgrid-client"];
-	[authenticator setPassword:xgridControllerPassword];
-	[xgridConnection setAuthenticator:authenticator];
-	[authenticator release];
-	
-	//go!!
-	[xgridConnection setDelegate:self];
-	[xgridConnection open];
-}
-
-//sixth attempt to connect
-//trying to use a remote connection with Kerberos
-- (void)connect6
-{
-	DLog(NSStringFromClass([self class]),10,@"<%@:%p> %s",[self class],self,_cmd);
-	printf ("Connecting to remote controller at address '%s' using single sign-on credentials\n",[xgridControllerHostname UTF8String]);
-
-	//release the old XGConnection
-	[xgridConnection setDelegate:nil];
-	[xgridConnection release];
-	
-	//create a new XGConnection
-	xgridConnection = [[XGConnection alloc] initWithHostname:xgridControllerHostname portnumber:0];
-	
-	//set the authenticator
-	XGGSSAuthenticator *authenticator = [[XGGSSAuthenticator alloc] init];
-	NSString *servicePrincipal = [xgridConnection servicePrincipal];
-	if (servicePrincipal == nil)
-		servicePrincipal=[NSString stringWithFormat:@"xgrid/%@", [xgridConnection name]];		
-	[authenticator setServicePrincipal:servicePrincipal];
-	[xgridConnection setAuthenticator:authenticator];
-	[authenticator release];
-	
-	//go!!
-	[xgridConnection setDelegate:self];
-	[xgridConnection open];
-}
-
-
-- (void)connect
-{
-	DLog(NSStringFromClass([self class]),10,@"<%@:%p> %s",[self class],self,_cmd);
-
-	//depending on the hostname and password values, we have decided on a series of connection type to make,
-	//as defined by the array connectionSelectors, enumerated by selectorEnumerator
-	NSString *selectorString = [selectorEnumerator nextObject];
-	if ( selectorString == nil )
-		[self raiseConnectionError];
-	else {
-		selectorString = [@"connect" stringByAppendingString:selectorString];
-		SEL selector = NSSelectorFromString (selectorString);
-		[self performSelector:selector];
-	}
-}
 
 - (void)start
 {
 	DLog(NSStringFromClass([self class]),10,@"<%@:%p> %s",[self class],self,_cmd);
-	[self connect];
-	//[NSTimer scheduledTimerWithTimeInterval:reportInterval target:self selector:@selector(reportWithTimer:) userInfo:nil repeats:YES];
+
+	NSEnumerator *e = [servers objectEnumerator];	
+	GEZServerHook *aServer;
+	while ( aServer = [e nextObject] ) {
+		if ( [aServer isLoaded] )
+			[self serverDidLoad:[NSNotification notificationWithName:GEZServerHookDidLoadNotification object:aServer]];
+		else {					
+			[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(serverDidLoad:) name:GEZServerHookDidLoadNotification object:aServer];		
+			[aServer connect];
+		}
+	}
+	
+	//report server loading to keep the user entertained if it takes a while
+	if ( [self verbose] )
+		[NSTimer scheduledTimerWithTimeInterval:PROGRESS_NOTIFICATION_INTERVAL target:self selector:@selector(reportServerLoading:) userInfo:nil repeats:YES];
+
 }
 
+- (void)reportAgentLoading:(NSTimer *)aTimer
+{
+	if ( [self allAgentsLoaded] ) {
+		[aTimer invalidate];
+		return;
+	}
+	if ( [self verbose] )
+		printf ( "Waiting for agent information: %d/%d agents ready\n", [self countAgentLoaded], [self countAgents] );
+}
 
+- (void)reportServerLoading:(NSTimer *)aTimer
+{
+	if ( [self allServersLoaded] ) {
+		[aTimer invalidate];
+		return;
+	}
+	if ( [self verbose] )
+		printf ( "Waiting for grid information: %d/%d controllers ready\n", [self countServerLoaded], [servers count] );
+}
 
-#pragma mark *** XGConnection delegate methods ***
+#pragma mark *** notifications ***
 
-- (void)connectionDidOpen:(XGConnection *)connection;
+- (void)serverDidLoad:(NSNotification *)notification
 {
 	DLog(NSStringFromClass([self class]),10,@"<%@:%p> %s",[self class],self,_cmd);
 	
-	printf ( "Connection established.\n" );
-	printf ( "Writing report every %f seconds.\n", reportInterval );
-	[self report];
-	[NSTimer scheduledTimerWithTimeInterval:reportInterval target:self selector:@selector(reportWithTimer:) userInfo:nil repeats:YES];
+	GEZServerHook *loadedServer = [notification object];
 	
-	[xgridController release];
-	xgridController = [[XGController alloc] initWithConnection:xgridConnection];
-	[selectorEnumerator release];
-	selectorEnumerator = nil;
-	[connectionSelectors release];
-	connectionSelectors = nil;
+	if ( [self verbose] )
+		printf ( "Connection established with controller '%s'.\n", [[loadedServer address] UTF8String] );
+
+	NSEnumerator *e = [[loadedServer grids] objectEnumerator];
+	GEZGridHook *aGrid;
+	while  ( aGrid = [e nextObject] ) {
+		[aGrid setShouldObserveAgents:YES];
+		if ( [aGrid agentsLoaded] )
+			[self agentsDidLoad:[NSNotification notificationWithName:GEZGridHookDidChangeAgentsNotification object:aGrid]];
+		else
+			[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(agentsDidLoad:) name:GEZGridHookDidLoadAgentsNotification object:aGrid];
+	}
 	
-	[xgridController sendAgentListRequest];
-	
+	//report on agent loading to keep the user entertained if it takes a while
+	if ( [self allServersLoaded] && [self verbose] )
+		[NSTimer scheduledTimerWithTimeInterval:PROGRESS_NOTIFICATION_INTERVAL target:self selector:@selector(reportAgentLoading:) userInfo:nil repeats:YES];
+
 }
 
-- (void)connectionDidNotOpen:(XGConnection *)connection withError:(NSError *)error
+- (void)agentsDidLoad:(NSNotification *)notification
 {
 	DLog(NSStringFromClass([self class]),10,@"<%@:%p> %s",[self class],self,_cmd);
-	
-	[self connect];
-}
 
-- (void)connectionDidClose:(XGConnection *)connection;
-{
-	DLog(NSStringFromClass([self class]),10,@"<%@:%p> %s",[self class],self,_cmd);
+	//one of the grid is ready
+	GEZGridHook *loadedGrid = [notification object];
+	[[NSNotificationCenter defaultCenter] removeObserver:self name:GEZGridHookDidChangeAgentsNotification object:loadedGrid];
+	if ( [self verbose] )
+		printf ( "Grid '%s' for controller '%s' ready.\n", [[[loadedGrid xgridGrid] name] UTF8String], [[[loadedGrid serverHook] address] UTF8String] );
 	
-	[self connect];
+	//if all grids are ready, it is time for a first report
+	if ( [self allAgentsLoaded] ) {
+		if ( [self verbose] ) {
+			if ( reportInterval != 0 )
+				printf ( "All grids ready. Writing report every %d seconds.\n", (int)(reportInterval) );
+			else
+				printf ( "All grids ready. Writing report.\n");
+		}
+		[self report];
+		[NSTimer scheduledTimerWithTimeInterval:reportInterval target:self selector:@selector(reportWithTimer:) userInfo:nil repeats:YES];
+	}
+
 }
 
 @end

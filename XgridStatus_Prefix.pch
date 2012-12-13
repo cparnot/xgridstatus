@@ -6,4 +6,5 @@
     #import <Foundation/Foundation.h>
 	#import <XgridFoundation/XgridFoundation.h>
 	#import "DebugLog.h"
+	#import "XgridPrivate.h"
 #endif

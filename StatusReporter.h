@@ -8,24 +8,39 @@
 
 #import <Cocoa/Cocoa.h>
 
+typedef enum {
+	XgridStatusReportTypeOldPlist = 0,
+	XgridStatusReportTypePlist = 1,
+	XgridStatusReportTypeXML = 2,
+	XgridStatusReportTypeBinary = 3,
+} XgridStatusReportType;
 
 @interface StatusReporter : NSObject
 {
-	NSString *xgridControllerHostname;
-	NSString *xgridControllerPassword;
+	NSArray *servers;
 	double reportInterval;
 	NSString *outputFilePath;
-	
-	XGController *xgridController;
-	XGConnection *xgridConnection;
-	
-	//keeping track of connection attempts
-	NSArray *connectionSelectors;
-	NSEnumerator *selectorEnumerator;
+	int verbose;
+	BOOL agentDetails;
+	BOOL gridDetails;
+	BOOL serverDetails;
+	XgridStatusReportType reportType;
 }
 
-- (id)initWithXgridController:(NSString *)hostname password:(NSString *)password reportInterval:(double)interval output:(NSString *)path;
+- (id)initWithServers:(NSArray *)servers reportInterval:(double)interval output:(NSString *)path;
 
 - (void)start;
+
+- (void)setVerbose:(BOOL)flag;
+- (BOOL)verbose;
+- (void)setAgentDetails:(BOOL)flag;
+- (void)setGridDetails:(BOOL)flag;
+- (void)setServerDetails:(BOOL)flag;
+- (void)setReportType:(XgridStatusReportType)type;
+
+- (void)serverDidLoad:(NSNotification *)notification;
+- (void)agentsDidLoad:(NSNotification *)notification;
+
+
 
 @end

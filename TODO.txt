@@ -1,0 +1,6 @@
+version 2.0
+
+DONE:
+* Add Keychain support
+* Add timer to keep user informed of (slow) progress
+* Have different output formats available
