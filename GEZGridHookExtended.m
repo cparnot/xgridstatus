@@ -10,6 +10,7 @@
 #import "GEZGridHookExtended.h"
 #import "GEZServerHook.h"
 #import "GEZResourceObserver.h"
+#import "GEZResourceArrayObserver.h"
 
 //NSString *GEZGridHookDidChangeAgentsNotification = @"GEZGridHookDidChangeAgentsNotification";
 //NSString *GEZGridHookDidLoadAgentsNotification = @"GEZGridHookDidLoadAgentsNotification";
@@ -49,12 +50,15 @@ typedef enum {
 {
 	DLog(NSStringFromClass([self class]),10,@"<%@:%p> %s",[self class],self,_cmd);
 
-	[xgridAgentObservers release];
+	[xgridGridObserverForAgentsKey setDelegate:nil];
+	[xgridGridObserverForAgentsKey release];
+		
+	[xgridAgentsObserver setDelegate:nil];
+	[xgridAgentsObserver release];
+	
 	[super dealloc];
 }
 
-
-#pragma mark *** agent observing ***
 
 //public
 - (BOOL)agentsLoaded
@@ -62,23 +66,23 @@ typedef enum {
 	return allAgentsUpdated;
 }
 
+#pragma mark *** XGGrid observing, going from "Updated" to "Loaded" ***
+
 
 - (void)startAgentObservation
 {
-	DLog(NSStringFromClass([self class]),10,@"<%@:%p> %s",[self class],self,_cmd);
+	if ( allAgentsUpdated == YES )
+		return;
 	
-	//create GEZResourceObserver objects to observe them until they are all updated
-	NSArray *xgridAgents = [xgridGrid agents];
-	NSMutableSet *observers = [NSMutableSet setWithCapacity:[xgridAgents count]];
-	NSEnumerator *e = [xgridAgents objectEnumerator];
-	XGAgent *oneAgent;
-	while ( oneAgent = [e nextObject] ) {
-		GEZResourceObserver *resourceObserver = [[[GEZResourceObserver alloc] initWithResource:oneAgent] autorelease];
-		[resourceObserver setDelegate:self];
-		[observers addObject:resourceObserver];
-		
+	if ( xgridAgentsObserver == nil ) {
+		xgridAgentsObserver = [[GEZResourceArrayObserver alloc] initWithResources:[xgridGrid agents]];
+		[xgridAgentsObserver setDelegate:self];
+	} else
+		[xgridAgentsObserver setXgridResources:[xgridGrid agents]];
+	
+	if ( xgridGridObserverForAgentsKey == nil ) {
+		xgridGridObserverForAgentsKey = [[GEZResourceObserver alloc] initWithResource:xgridGrid observedKeys:[NSSet setWithObject:@"agents"]];
 	}
-	xgridAgentObservers = [observers copy];
 	
 }
 
@@ -86,35 +90,27 @@ typedef enum {
 {
 	if ( allAgentsUpdated == YES )
 		return YES;
-	
-	//looping through the XGAgent, hoping all are updated
-	allAgentsUpdated = YES;
-	NSEnumerator *e = [[xgridGrid agents] objectEnumerator];
-	XGAgent *oneAgent;
-	while ( oneAgent = [e nextObject] ) {
-		if ( [oneAgent isUpdated] == NO ) {
-			allAgentsUpdated = NO;
-			[e allObjects];
-		}
-	}
-	
-	//if all agents are updated, we are done; otherwise, we might need to start observing them
-	if ( allAgentsUpdated ) {
-		[xgridAgentObservers release];
-		xgridAgentObservers = nil;
-	} else if ( xgridAgentObservers == nil )
-		[self startAgentObservation];
-	
+	[self startAgentObservation];
+	allAgentsUpdated = [xgridAgentsObserver allXgridResourcesUpdated];
 	return allAgentsUpdated;
 }
 
-
-#pragma mark *** XGGrid observing, going from "Connected" to "Updated" ***
-
 - (BOOL)checkIfAllChildrenUpdated
 {
-	return ( [super checkIfAllChildrenUpdated] && [self checkIfAllAgentsUpdated] );
+	return ( [self checkIfAllJobsUpdated] && [self checkIfAllAgentsUpdated] );
 }
+
+
+
+//delegate callback from GEZResourceObserver
+- (void)xgridResourceAgentsDidChange:(XGResource *)resource
+{
+	DLog(NSStringFromClass([self class]),10,@"<%@:%p> %s",[self class],self,_cmd);	
+	
+	[xgridAgentsObserver setXgridResources:[xgridGrid agents]];
+	[self checkIfLoaded];
+}
+
 
 
 @end

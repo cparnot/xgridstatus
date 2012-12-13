@@ -6,6 +6,7 @@
 //  Copyright 2006 __MyCompanyName__. All rights reserved.
 //
 
+/* Transforms an XGResourceState enum value into a human-readable NSString */
 
 @interface ResourceStateToStringTransformer : NSValueTransformer
 {

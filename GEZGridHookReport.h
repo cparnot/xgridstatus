@@ -6,8 +6,8 @@
 //  Copyright 2006 __MyCompanyName__. All rights reserved.
 //
 
-/* produces report for an individual grid */
-/* implemented as a category on GEZGridHook */
+/* Category on GEZGridHook that can produce reports for the corresponding XGGrid object */
+
 
 
 #import "GEZGridHook.h"

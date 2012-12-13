@@ -1,6 +1,6 @@
 ### Description
 
-<code>xgridstatus</code> is a command-line utility to retrieve information about controllers, grids, agents and jobs. It provides some of the functionality of Xgrid Admin: agent list, job list, agent statistics and job statistics. The report about agent statistics is for instance used to provide information for the Xgrid@Stanford widget.
+<code>xgridstatus</code> is a command-line utility to retrieve information about controllers, grids, agents and jobs. It provides some of the functionality of Xgrid Admin and more: agent list, job list, agent statistics, job statistics, automatic removal of inactive agents. The report about agent statistics is for instance used to provide information for the [OpenMacGrid](http://www.macresearch.org) widget.
 
 The features include:
 
@@ -10,10 +10,11 @@ The features include:
 * simultaneous connection to several controllers (-hpk)
 * automatic reconnections after controller crashes
 * storage of controller passwords in the user keychain (-k)
+* automatic removal of inactive agents (-m)
 
 ### Usage
 
-	xgridstatus [ [-h hostname] [-p password | -k password] ]* [-r interval] [-o file] [-abcgjlstvxAJT]
+	xgridstatus [ [-h hostname] [-p password | -k password] ]* [-r interval] [-o file] [-abcgjlmstvxAJT]
 
 
 * Connection options (note that you can include several -h options, to connect to several controllers)
@@ -51,6 +52,11 @@ The features include:
 	    -j           include job list
 	    -T           include time stamp
 
+* Cleanup option
+
+	    -m           remove agents that are offline with no CPU activity
+                     (no effect without the -a or -A option also selected)
+					 
 * Verbose options (the default setting depends on the other options)
 
 	    -v           verbose, opposite of silent
@@ -61,6 +67,20 @@ The features include:
 For output compatible with Xgrid@Stanford widget, use the following options:
 
 	    xgridstatus -h host1 [-h host2 ...] [-s] -xAT -r 10 -o path/to/file.xml
+
+### User defaults
+
+In verbose mode, progress messages are displayed every 5 secs.
+This default can be changed using the following command:
+
+    defaults write xgridstatus IntervalForLoadingProgressReports xxx
+
+where xxx is a number of seconds.
+
+
+### Acknowledgements
+
+Many thanks to Kevin Ballard (http://kevin.sb.org) for his MethodSwizzle implementation, that xgridstatus uses to work around a bug in Xgrid. In some circumstances, the BEEP framework raises an exception because the -addObject: method of the NSCFArray class is called with a nil argument. By skipping this exception (using the MethodSwizzle trick), xgridstatus is able to get things going and continue its work.
 
 
 ### Examples

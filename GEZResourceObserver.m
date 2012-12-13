@@ -61,6 +61,17 @@ __END_LICENSE__ */
 	delegate = anObject;
 }
 
+- (XGResource *)resource
+{
+	return xgridResource;
+}
+
+- (NSSet *)observedKeys
+{
+	return observedKeys;
+}
+
+
 - (void)setObservedKeys:(NSSet *)keys
 {
 	if ( keys == observedKeys )

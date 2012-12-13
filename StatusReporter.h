@@ -31,12 +31,17 @@ typedef enum {
 	BOOL agentStats;
 	BOOL jobStats;
 	BOOL timeStamp;
+	BOOL shouldCleanAgents;
+	BOOL shouldCleanJobs;
+	int daysBeforeJobExpiration;
 	XgridStatusReportType reportType;
 	
 	//internals
 	NSDictionary *currentStatusDictionary;
 	NSDictionary *lastServerReports;
 	NSTimer *reportStatusTimer;
+	NSMutableArray *agentCleaners;
+	NSMutableArray *jobCleaners;
 }
 
 - (id)initWithServers:(NSArray *)servers reportInterval:(double)interval output:(NSString *)path;
@@ -57,6 +62,13 @@ typedef enum {
 - (void)setJobStats:(BOOL)value;
 - (BOOL)timeStamp;
 - (void)setTimeStamp:(BOOL)value;
+
+- (void)setShouldCleanAgents:(BOOL)value;
+- (BOOL)shouldCleanAgents;
+- (BOOL)shouldCleanJobs;
+- (void)setShouldCleanJobs:(BOOL)newShouldCleanJobs;
+- (int)daysBeforeJobExpiration;
+- (void)setDaysBeforeJobExpiration:(int)newDaysBeforeJobExpiration;
 
 - (void)setVerbose:(BOOL)flag;
 - (BOOL)verbose;

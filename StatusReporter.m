@@ -12,6 +12,8 @@
 //#import "GEZAgentHook.h"
 #import "GEZGridHookReport.h"
 #import "PlistCategories.h"
+#import "AgentCleaner.h"
+#import "JobCleaner.h"
 
 @implementation StatusReporter
 
@@ -34,6 +36,9 @@
 {
 	[servers release];
 	[outputFilePath release];
+	[agentCleaners release];
+	[currentStatusDictionary release];
+	[lastServerReports release];
 	[super dealloc];
 }
 
@@ -70,6 +75,37 @@
 	else
 		return (BOOL)verbose;
 }
+
+- (BOOL)shouldCleanJobs
+{
+	return shouldCleanJobs;
+}
+
+- (void)setShouldCleanJobs:(BOOL)newValue
+{
+	shouldCleanJobs = newValue;
+}
+
+- (int)daysBeforeJobExpiration
+{
+	return daysBeforeJobExpiration;
+}
+
+- (void)setDaysBeforeJobExpiration:(int)newDaysBeforeJobExpiration
+{
+	daysBeforeJobExpiration = newDaysBeforeJobExpiration;
+}
+
+- (void)setShouldCleanAgents:(BOOL)value
+{
+	shouldCleanAgents = value;
+}
+
+- (BOOL)shouldCleanAgents
+{
+	return shouldCleanAgents;
+}
+
 
 - (BOOL)serverList {
     return serverList;
@@ -202,8 +238,22 @@ NSMutableDictionary *SumOfValuesInDictionaries(NSDictionary *dictionaries, NSArr
 		[aggregate setObject:dictionaries forKey:childrenKey];
 	//agent and job lists should only be added if not already in the grid list
 	else  {
-		if ( agentList ) [aggregate setValue:[[dictionaries allValues] valueForKeyPath:@"@unionOfArrays.agents"] forKey:@"agents"];
-		if ( jobList ) [aggregate setValue:[[dictionaries allValues] valueForKeyPath:@"@unionOfArrays.jobs"] forKey:@"jobs"];
+		if ( agentList ) {
+			NSMutableDictionary *allAgents = [NSMutableDictionary dictionary];
+			NSEnumerator *e = [dictionaries objectEnumerator];
+			NSDictionary *oneReport;
+			while ( oneReport = [e nextObject] )
+				[allAgents addEntriesFromDictionary:[oneReport objectForKey:@"agents"]];
+			[aggregate setValue:allAgents forKey:@"agents"];
+		}
+		if ( jobList ) {
+			NSMutableDictionary *allJobs = [NSMutableDictionary dictionary];
+			NSEnumerator *e = [dictionaries objectEnumerator];
+			NSDictionary *oneReport;
+			while ( oneReport = [e nextObject] )
+				[allJobs addEntriesFromDictionary:[oneReport objectForKey:@"jobs"]];
+			[aggregate setValue:allJobs forKey:@"jobs"];
+		}
 	}	
 	return aggregate;
 }
@@ -462,14 +512,17 @@ NSMutableDictionary *SumOfValuesInDictionaries(NSDictionary *dictionaries, NSArr
 	else {
 		int countGrids = [[aServer grids] count];
 		NSArray *allAgents = [aServer valueForKeyPath:@"grids.@distinctUnionOfArrays.xgridGrid.agents"];
+		NSArray *allJobs = [aServer valueForKeyPath:@"grids.@distinctUnionOfArrays.xgridGrid.jobs"];
 		int countAgents = [allAgents count];
+		int countJobs = [allJobs count];
 		if ( [aServer isUpdated] ) {
 			int countUpdatedGrids = [[aServer valueForKeyPath:@"grids.@sum.isUpdated"] intValue];
 			//if all grids are updated, we know for sure the number of agents
 			if ( countUpdatedGrids == countGrids ) {
 				int countLoadedGrids = [[aServer valueForKeyPath:@"grids.@sum.isLoaded"] intValue];
 				int countUpdatedAgents = [[allAgents valueForKeyPath:@"@sum.isUpdated"] intValue];
-				printf("In progress: Controller '%s' updated, %d/%d grids loaded, %d/%d agents loaded\n", address, countLoadedGrids, countGrids, countUpdatedAgents, countAgents);
+				int countUpdatedJobs = [[allJobs valueForKeyPath:@"@sum.isUpdated"] intValue];
+				printf("In progress: Controller '%s' updated, %d/%d grids loaded, %d/%d agents loaded, %d/%d jobs loaded\n", address, countLoadedGrids, countGrids, countUpdatedAgents, countAgents, countUpdatedJobs, countJobs);
 			} else
 				printf("In progress: Controller '%s' updated, %d/%d grids updated\n", address, countUpdatedGrids, countGrids);
 		} else {
@@ -503,17 +556,49 @@ NSMutableDictionary *SumOfValuesInDictionaries(NSDictionary *dictionaries, NSArr
 - (void)serverDidLoad:(NSNotification *)notification
 {
 	DLog(NSStringFromClass([self class]),10,@"<%@:%p> %s",[self class],self,_cmd);
-	
+
+	GEZServerHook *theServer = [notification object];
+
 	//report about the server just loaded
 	if ( [self verbose] ) {
-		GEZServerHook *theServer = [notification object];
-		NSString *message = [NSString stringWithFormat:@"Controller '%@' loaded, %@ grids, %d agents\n", [theServer address], [theServer valueForKeyPath:@"grids.@count"], [[theServer valueForKeyPath:@"grids.@distinctUnionOfArrays.xgridGrid.agents"]count]];
+		NSString *message = [NSString stringWithFormat:@"Controller '%@' loaded, %@ grids, %d agents, %d jobs\n", [theServer address], [theServer valueForKeyPath:@"grids.@count"], [[theServer valueForKeyPath:@"grids.@distinctUnionOfArrays.xgridGrid.agents"] count], [[theServer valueForKeyPath:@"grids.@distinctUnionOfArrays.xgridGrid.jobs"] count]];
 		printf ( "%s", [message UTF8String] );
 	}
-	
+
+	// start the agent cleaners
+	if (  [self shouldCleanAgents] ) {
+		if ( agentCleaners == nil )
+			agentCleaners = [[NSMutableArray alloc] init];
+		NSEnumerator *e = [[theServer grids] objectEnumerator];
+		GEZGridHook *aGrid;
+		while ( aGrid = [e nextObject] ) {
+			AgentCleaner *cleaner = [[[AgentCleaner alloc] initWithGrid:aGrid] autorelease];
+			[cleaner setVerbose:[self verbose]];
+			[agentCleaners addObject:cleaner];
+			[cleaner start];
+		}
+	}
+
+	// job cleaning is inactive for now
+	if ( NO /* [self shouldCleanJobs] == YES && [self daysBeforeJobExpiration] > 0 */ ) {
+		// start the job cleaners
+		if ( jobCleaners == nil )
+			jobCleaners = [[NSMutableArray alloc] init];
+		NSEnumerator *e = [[theServer grids] objectEnumerator];
+		GEZGridHook *aGrid;
+		while ( aGrid = [e nextObject] ) {
+			JobCleaner *cleaner = [[[JobCleaner alloc] initWithGrid:aGrid] autorelease];
+			[cleaner setVerbose:[self verbose]];
+			[cleaner setDaysBeforeExpiration:daysBeforeJobExpiration];
+			[jobCleaners addObject:cleaner];
+			[cleaner start];
+		}
+	}
+
 	//maybe all servers are loaded
-	if ( [self allServersLoaded] )
+	if ( [self allServersLoaded] ) {
 		[self setShouldReportStatus:YES];
+	}
 
 }
 
@@ -538,6 +623,23 @@ NSMutableDictionary *SumOfValuesInDictionaries(NSDictionary *dictionaries, NSArr
 		printf ( "Controller '%s' disconnected. Connection will be tried again later. [%s]\n", [[[notification object] address] UTF8String], [[[NSDate date] description] UTF8String] );
 		if ( [[servers valueForKeyPath:@"@sum.isLoaded"] intValue] > 0 )
 			printf ( "Reports will continue using the data available before disconnection.\n" );
+		
+		//remove agent cleaners for the corresponding grids
+		NSEnumerator *e = [[[agentCleaners copy] autorelease] objectEnumerator];
+		AgentCleaner *cleaner;
+		while ( cleaner = [e nextObject] ) {
+			if ( [[cleaner grid] serverHook] == [notification object] )
+				[agentCleaners removeObjectIdenticalTo:cleaner];
+		}
+
+		//remove agent cleaners for the corresponding grids
+		e = [[[jobCleaners copy] autorelease] objectEnumerator];
+		JobCleaner *cleaner2;
+		while ( cleaner2 = [e nextObject] ) {
+			if ( [[cleaner2 grid] serverHook] == [notification object] )
+				[jobCleaners removeObjectIdenticalTo:cleaner2];
+		}
+
 	}
 }
 

@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		560F86D90A96724200D97702 /* PlistCategories.m in Sources */ = {isa = PBXBuildFile; fileRef = 560F86D70A96724100D97702 /* PlistCategories.m */; };
+		5616D6AD0C7E295800E524B5 /* AgentCleaner.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 5616D6AB0C7E295800E524B5 /* AgentCleaner.h */; };
+		5616D6AE0C7E295800E524B5 /* AgentCleaner.m in Sources */ = {isa = PBXBuildFile; fileRef = 5616D6AC0C7E295800E524B5 /* AgentCleaner.m */; };
 		561C577B0A76EBAE00212BEC /* GEZGridHookReport.m in Sources */ = {isa = PBXBuildFile; fileRef = 561C57790A76EBAE00212BEC /* GEZGridHookReport.m */; };
 		561C57EF0A783DF000212BEC /* GEZGridHookExtended.m in Sources */ = {isa = PBXBuildFile; fileRef = 561C57580A76EB0900212BEC /* GEZGridHookExtended.m */; };
 		561C57F10A783DF100212BEC /* GEZServerHook.m in Sources */ = {isa = PBXBuildFile; fileRef = 561C575A0A76EB0900212BEC /* GEZServerHook.m */; };
@@ -16,6 +18,14 @@
 		563E83790A8417E500E34BAF /* ResourceStateToStringTransformer.m in Sources */ = {isa = PBXBuildFile; fileRef = 563E83770A8417E500E34BAF /* ResourceStateToStringTransformer.m */; };
 		5644868D0B9553C20058A309 /* GEZResourceObserver.m in Sources */ = {isa = PBXBuildFile; fileRef = 5644868B0B9553C20058A309 /* GEZResourceObserver.m */; };
 		564486C10B9565E70058A309 /* GEZGridHook.m in Sources */ = {isa = PBXBuildFile; fileRef = 564486BF0B9565E70058A309 /* GEZGridHook.m */; };
+		56DB48A50C8152DC00566BBD /* GEZResourceArrayObserver.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 56DB48A30C8152DC00566BBD /* GEZResourceArrayObserver.h */; };
+		56DB48A60C8152DC00566BBD /* GEZResourceArrayObserver.m in Sources */ = {isa = PBXBuildFile; fileRef = 56DB48A40C8152DC00566BBD /* GEZResourceArrayObserver.m */; };
+		56DB4B930C83A17200566BBD /* JobCleaner.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 56DB4B910C83A17200566BBD /* JobCleaner.h */; };
+		56DB4B940C83A17300566BBD /* JobCleaner.m in Sources */ = {isa = PBXBuildFile; fileRef = 56DB4B920C83A17200566BBD /* JobCleaner.m */; };
+		56DB4C5C0C84D7CE00566BBD /* MethodSwizzle.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 56DB4C5A0C84D7CD00566BBD /* MethodSwizzle.h */; };
+		56DB4C5D0C84D7CE00566BBD /* MethodSwizzle.m in Sources */ = {isa = PBXBuildFile; fileRef = 56DB4C5B0C84D7CE00566BBD /* MethodSwizzle.m */; };
+		56DB4C660C84D90300566BBD /* GEZSwizzleNSArray.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 56DB4C640C84D90300566BBD /* GEZSwizzleNSArray.h */; };
+		56DB4C670C84D90300566BBD /* GEZSwizzleNSArray.m in Sources */ = {isa = PBXBuildFile; fileRef = 56DB4C650C84D90300566BBD /* GEZSwizzleNSArray.m */; };
 		56E23F750B9E9382009995FE /* GEZGridHookPoser.m in Sources */ = {isa = PBXBuildFile; fileRef = 56E23F730B9E9382009995FE /* GEZGridHookPoser.m */; };
 		56E2AD12088E087D0097E200 /* XgridFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 56E2AD11088E087D0097E200 /* XgridFoundation.framework */; };
 		56E458B7088D86880096D72B /* StatusReporter.m in Sources */ = {isa = PBXBuildFile; fileRef = 56E458B5088D86880096D72B /* StatusReporter.m */; };
@@ -34,6 +44,11 @@
 			files = (
 				8DD76F9F0486AA7600D96B5E /* xgridstatus.1 in CopyFiles */,
 				5624A2000BA51BAF005AE1E6 /* documentation.markdown in CopyFiles */,
+				5616D6AD0C7E295800E524B5 /* AgentCleaner.h in CopyFiles */,
+				56DB48A50C8152DC00566BBD /* GEZResourceArrayObserver.h in CopyFiles */,
+				56DB4B930C83A17200566BBD /* JobCleaner.h in CopyFiles */,
+				56DB4C5C0C84D7CE00566BBD /* MethodSwizzle.h in CopyFiles */,
+				56DB4C660C84D90300566BBD /* GEZSwizzleNSArray.h in CopyFiles */,
 			);
 			runOnlyForDeploymentPostprocessing = 1;
 		};
@@ -46,6 +61,8 @@
 		560F85F20A9532DB00D97702 /* TODO.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = TODO.txt; sourceTree = "<group>"; };
 		560F86D60A96724100D97702 /* PlistCategories.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PlistCategories.h; sourceTree = "<group>"; };
 		560F86D70A96724100D97702 /* PlistCategories.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PlistCategories.m; sourceTree = "<group>"; };
+		5616D6AB0C7E295800E524B5 /* AgentCleaner.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AgentCleaner.h; sourceTree = "<group>"; };
+		5616D6AC0C7E295800E524B5 /* AgentCleaner.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AgentCleaner.m; sourceTree = "<group>"; };
 		561C57570A76EB0900212BEC /* GEZGridHookExtended.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = GEZGridHookExtended.h; sourceTree = "<group>"; };
 		561C57580A76EB0900212BEC /* GEZGridHookExtended.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; path = GEZGridHookExtended.m; sourceTree = "<group>"; };
 		561C57590A76EB0900212BEC /* GEZServerHook.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = GEZServerHook.h; sourceTree = "<group>"; };
@@ -60,6 +77,14 @@
 		5644868B0B9553C20058A309 /* GEZResourceObserver.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; path = GEZResourceObserver.m; sourceTree = "<group>"; };
 		564486BE0B9565E70058A309 /* GEZGridHook.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = GEZGridHook.h; sourceTree = "<group>"; };
 		564486BF0B9565E70058A309 /* GEZGridHook.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; path = GEZGridHook.m; sourceTree = "<group>"; };
+		56DB48A30C8152DC00566BBD /* GEZResourceArrayObserver.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GEZResourceArrayObserver.h; sourceTree = "<group>"; };
+		56DB48A40C8152DC00566BBD /* GEZResourceArrayObserver.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GEZResourceArrayObserver.m; sourceTree = "<group>"; };
+		56DB4B910C83A17200566BBD /* JobCleaner.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = JobCleaner.h; sourceTree = "<group>"; };
+		56DB4B920C83A17200566BBD /* JobCleaner.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = JobCleaner.m; sourceTree = "<group>"; };
+		56DB4C5A0C84D7CD00566BBD /* MethodSwizzle.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = MethodSwizzle.h; sourceTree = "<group>"; };
+		56DB4C5B0C84D7CE00566BBD /* MethodSwizzle.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; path = MethodSwizzle.m; sourceTree = "<group>"; };
+		56DB4C640C84D90300566BBD /* GEZSwizzleNSArray.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GEZSwizzleNSArray.h; sourceTree = "<group>"; };
+		56DB4C650C84D90300566BBD /* GEZSwizzleNSArray.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GEZSwizzleNSArray.m; sourceTree = "<group>"; };
 		56E23F720B9E9382009995FE /* GEZGridHookPoser.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GEZGridHookPoser.h; sourceTree = "<group>"; };
 		56E23F730B9E9382009995FE /* GEZGridHookPoser.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GEZGridHookPoser.m; sourceTree = "<group>"; };
 		56E2AD11088E087D0097E200 /* XgridFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XgridFoundation.framework; path = /System/Library/Frameworks/XgridFoundation.framework; sourceTree = "<absolute>"; };
@@ -91,8 +116,10 @@
 			children = (
 				560F85F20A9532DB00D97702 /* TODO.txt */,
 				5624A1FF0BA51BAF005AE1E6 /* documentation.markdown */,
-				561C57610A76EB2700212BEC /* from GridEZ */,
-				08FB7795FE84155DC02AAC07 /* Source */,
+				561C57610A76EB2700212BEC /* GridEZ */,
+				5616D65C0C7E26B300E524B5 /* GridEZ extended */,
+				5616D6A40C7E28C700E524B5 /* Main Sources */,
+				08FB7795FE84155DC02AAC07 /* Misc Sources */,
 				C6859EA2029092E104C91782 /* Documentation */,
 				08FB779DFE84155DC02AAC07 /* External Frameworks and Libraries */,
 				1AB674ADFE9D54B511CA2CBB /* Products */,
@@ -100,22 +127,21 @@
 			name = XgridStatus;
 			sourceTree = "<group>";
 		};
-		08FB7795FE84155DC02AAC07 /* Source */ = {
+		08FB7795FE84155DC02AAC07 /* Misc Sources */ = {
 			isa = PBXGroup;
 			children = (
 				56E2AD8C088E1A460097E200 /* XgridPrivate.h */,
 				32A70AAB03705E1F00C91783 /* XgridStatus_Prefix.pch */,
-				08FB7796FE84155DC02AAC07 /* XgridStatus.m */,
+				56DB4C5A0C84D7CD00566BBD /* MethodSwizzle.h */,
+				56DB4C5B0C84D7CE00566BBD /* MethodSwizzle.m */,
 				56E458C8088D886D0096D72B /* DebugLog.h */,
 				56E458C9088D886D0096D72B /* DebugLog.m */,
-				56E458B4088D86880096D72B /* StatusReporter.h */,
-				56E458B5088D86880096D72B /* StatusReporter.m */,
 				563E83760A8417E400E34BAF /* ResourceStateToStringTransformer.h */,
 				563E83770A8417E500E34BAF /* ResourceStateToStringTransformer.m */,
 				560F86D60A96724100D97702 /* PlistCategories.h */,
 				560F86D70A96724100D97702 /* PlistCategories.m */,
 			);
-			name = Source;
+			name = "Misc Sources";
 			sourceTree = "<group>";
 		};
 		08FB779DFE84155DC02AAC07 /* External Frameworks and Libraries */ = {
@@ -136,7 +162,38 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		561C57610A76EB2700212BEC /* from GridEZ */ = {
+		5616D65C0C7E26B300E524B5 /* GridEZ extended */ = {
+			isa = PBXGroup;
+			children = (
+				56DB48A30C8152DC00566BBD /* GEZResourceArrayObserver.h */,
+				56DB48A40C8152DC00566BBD /* GEZResourceArrayObserver.m */,
+				56E23F720B9E9382009995FE /* GEZGridHookPoser.h */,
+				56E23F730B9E9382009995FE /* GEZGridHookPoser.m */,
+				561C57570A76EB0900212BEC /* GEZGridHookExtended.h */,
+				561C57580A76EB0900212BEC /* GEZGridHookExtended.m */,
+				561C57780A76EBAE00212BEC /* GEZGridHookReport.h */,
+				561C57790A76EBAE00212BEC /* GEZGridHookReport.m */,
+				56DB4C640C84D90300566BBD /* GEZSwizzleNSArray.h */,
+				56DB4C650C84D90300566BBD /* GEZSwizzleNSArray.m */,
+			);
+			name = "GridEZ extended";
+			sourceTree = "<group>";
+		};
+		5616D6A40C7E28C700E524B5 /* Main Sources */ = {
+			isa = PBXGroup;
+			children = (
+				08FB7796FE84155DC02AAC07 /* XgridStatus.m */,
+				56E458B4088D86880096D72B /* StatusReporter.h */,
+				56E458B5088D86880096D72B /* StatusReporter.m */,
+				5616D6AB0C7E295800E524B5 /* AgentCleaner.h */,
+				5616D6AC0C7E295800E524B5 /* AgentCleaner.m */,
+				56DB4B910C83A17200566BBD /* JobCleaner.h */,
+				56DB4B920C83A17200566BBD /* JobCleaner.m */,
+			);
+			name = "Main Sources";
+			sourceTree = "<group>";
+		};
+		561C57610A76EB2700212BEC /* GridEZ */ = {
 			isa = PBXGroup;
 			children = (
 				5644868A0B9553C20058A309 /* GEZResourceObserver.h */,
@@ -145,14 +202,8 @@
 				561C575A0A76EB0900212BEC /* GEZServerHook.m */,
 				564486BE0B9565E70058A309 /* GEZGridHook.h */,
 				564486BF0B9565E70058A309 /* GEZGridHook.m */,
-				56E23F720B9E9382009995FE /* GEZGridHookPoser.h */,
-				56E23F730B9E9382009995FE /* GEZGridHookPoser.m */,
-				561C57570A76EB0900212BEC /* GEZGridHookExtended.h */,
-				561C57580A76EB0900212BEC /* GEZGridHookExtended.m */,
-				561C57780A76EBAE00212BEC /* GEZGridHookReport.h */,
-				561C57790A76EBAE00212BEC /* GEZGridHookReport.m */,
 			);
-			name = "from GridEZ";
+			name = GridEZ;
 			sourceTree = "<group>";
 		};
 		C6859EA2029092E104C91782 /* Documentation */ = {
@@ -190,9 +241,11 @@
 		08FB7793FE84155DC02AAC07 /* Project object */ = {
 			isa = PBXProject;
 			buildConfigurationList = 56E4587F088D7FDD0096D72B /* Build configuration list for PBXProject "XgridStatus" */;
+			compatibilityVersion = "Xcode 2.4";
 			hasScannedForEncodings = 1;
 			mainGroup = 08FB7794FE84155DC02AAC07 /* XgridStatus */;
 			projectDirPath = "";
+			projectRoot = "";
 			targets = (
 				8DD76F960486AA7600D96B5E /* XgridStatus */,
 			);
@@ -215,6 +268,11 @@
 				5644868D0B9553C20058A309 /* GEZResourceObserver.m in Sources */,
 				564486C10B9565E70058A309 /* GEZGridHook.m in Sources */,
 				56E23F750B9E9382009995FE /* GEZGridHookPoser.m in Sources */,
+				5616D6AE0C7E295800E524B5 /* AgentCleaner.m in Sources */,
+				56DB48A60C8152DC00566BBD /* GEZResourceArrayObserver.m in Sources */,
+				56DB4B940C83A17300566BBD /* JobCleaner.m in Sources */,
+				56DB4C5D0C84D7CE00566BBD /* MethodSwizzle.m in Sources */,
+				56DB4C670C84D90300566BBD /* GEZSwizzleNSArray.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -21,11 +21,13 @@
 
 @class GEZServerHook;
 @class GEZResourceObserver;
+@class GEZResourceArrayObserver;
 
 @interface GEZGridHookExtended : GEZGridHookPoser
 {
+	GEZResourceObserver *xgridGridObserverForAgentsKey;
 	//observing XGAgent objects
-	NSSet *xgridAgentObservers;
+	GEZResourceArrayObserver *xgridAgentsObserver;
 	BOOL allAgentsUpdated;
 }
 

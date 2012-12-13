@@ -27,6 +27,7 @@ APPKIT_EXTERN NSString *GEZGridHookDidChangeJobsNotification;
 
 @class GEZServerHook;
 @class GEZResourceObserver;
+@class GEZResourceArrayObserver;
 
 @interface GEZGridHook : NSObject
 {
@@ -36,7 +37,7 @@ APPKIT_EXTERN NSString *GEZGridHookDidChangeJobsNotification;
 	GEZResourceObserver *xgridGridObserver;
 
 	//observing XGJob objects
-	NSSet *xgridJobObservers;
+	GEZResourceArrayObserver *xgridJobsObserver;
 	BOOL allJobsUpdated;
 }
 
@@ -49,9 +50,6 @@ APPKIT_EXTERN NSString *GEZGridHookDidChangeJobsNotification;
 - (BOOL)isUpdated;
 - (BOOL)isLoaded;
 - (GEZServerHook *)serverHook;
-
-//this is designed to be subclasses, e.g. to include agents
-- (BOOL)checkIfAllChildrenUpdated;
 
 @end
 

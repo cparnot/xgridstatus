@@ -6,7 +6,11 @@
 
 void print_usage ( )
 {
-	printf ("usage: xgridstatus [ [-h hostname] [-p password | -k password] ]* [-r interval] [-o file] [-abcgjlstvxAJT]\n");
+	printf ("xgridstatus version 4.0b1\n");
+	printf ("A command-line tool to generate Xgrid reports\n");
+	printf ("Created by Charles Parnot, August 2007\n");
+	printf ("\n");
+	printf ("usage: xgridstatus [ [-h hostname] [-p password | -k password] ]* [-r interval] [-o file] [-n xxx] -abcgjlmstvxAJT]\n");
 	printf ("\n");
 	printf ("Result: aggregated report status for all controllers listed,\n");
 	printf ("        with optional details for each agent, grids and controller\n");
@@ -44,13 +48,27 @@ void print_usage ( )
 	printf ("    -j           include job list\n");
 	printf ("    -T           include time stamp\n");
 
+	//cleaning options
+	printf ("    -m           remove agents that are offline with no CPU activity\n");
+	printf ("                 (no effect without the -a or -A option also selected)\n");
+	//printf ("    -n xxx       remove jobs finished more than xxx days ago\n");
+	//printf ("                 (effective even without the -j or -J option)\n");
+
 	//misc
 	printf ("    -v           verbose, opposite of silent\n");
 	printf ("    -s           silent, opposite of verbose\n");
+	printf ("    -h           Prints this message (if no hostname follows)\n");
 	printf ("\n");
 	printf ("For output compatible with Xgrid@Stanford widget, use the following options:\n");
 	printf ("\n");
 	printf ("    xgridstatus -h host1 [-h host2 ...] [-s] -xAT -r 10 -o path/to/file.xml\n");
+	printf ("\n");
+	printf ("In verbose mode, progress messages are displayed every 5 secs.\n");
+	printf ("This default can be changed using the following command:\n");
+	printf ("\n");
+	printf ("    defaults write xgridstatus IntervalForLoadingProgressReports xxx\n");
+	printf ("\n");
+	printf ("where xxx is a number of seconds.\n");
 	
 	printf ("\n");
 	exit (0);
@@ -58,6 +76,9 @@ void print_usage ( )
 
 int main (int argc, const char * argv[])
 {
+	//method swizzling to avoid a bug with Xgrid, when the database gets corrupted a certain way, resulting in a call to -[NSCFArray addObject:] with a 'nil' argument
+	MethodSwizzle(NSClassFromString(@"NSCFArray"),@selector(addObject:),@selector(GEZSwizzleNSArray_addObject:));
+	
     NSAutoreleasePool * pool = [[NSAutoreleasePool alloc] init];
 
 	//get the arguments
@@ -75,6 +96,8 @@ int main (int argc, const char * argv[])
 	BOOL agentList = NO;
 	BOOL jobList = NO;
 	BOOL timeStamp = NO;
+	BOOL agentRemove = NO;
+	NSString *jobRemove = nil;
 	XgridStatusReportType reportType = XgridStatusReportTypeOldPlist;
 	int i = 0;
 	while ( ++i < argc ) {
@@ -122,6 +145,12 @@ int main (int argc, const char * argv[])
 				file = [NSString stringWithUTF8String:argv[i]];
 			else
 				print_usage();
+		} else if ( [arg isEqualToString:@"-n"] ) {
+			i++;
+			if ( i < argc )
+				jobRemove = [NSString stringWithUTF8String:argv[i]];
+			else
+				print_usage();
 		} else {
 			if ( [arg length] < 2 || [[arg substringToIndex:1] isEqualToString:@"-"] == NO )
 				print_usage();
@@ -151,6 +180,8 @@ int main (int argc, const char * argv[])
 				reportType = XgridStatusReportTypeOldPlist;
 			if ( [arg rangeOfString:@"x"].location != NSNotFound )
 				reportType = XgridStatusReportTypeXML;
+			if ( [arg rangeOfString:@"m"].location != NSNotFound )
+				agentRemove = YES;
 		}
 	}
 	
@@ -187,6 +218,8 @@ int main (int argc, const char * argv[])
 		printf ("    -a = %s\n", agentList?"YES":"NO");
 		printf ("    -j = %s\n", jobList?"YES":"NO");
 		printf ("    -T = %s\n", timeStamp?"YES":"NO");
+		printf ("    -m = %s\n", agentRemove?"YES":"NO");
+		printf ("    -n = %s\n", jobRemove?[jobRemove UTF8String]:"NO");
 		printf ("    -v = %s\n", verbose?"YES":"NO");
 		printf ("    -s = %s\n", verbose?"NO":"YES");
 		printf ("\n");
@@ -209,6 +242,16 @@ int main (int argc, const char * argv[])
 	[reporter setAgentStats:agentStats];
 	[reporter setJobStats:jobStats];
 	[reporter setReportType:reportType];
+	[reporter setShouldCleanAgents:agentRemove];
+	[reporter setTimeStamp:timeStamp];
+	if ( jobRemove > 0 ) {
+		[reporter setShouldCleanJobs:YES];
+		[reporter setDaysBeforeJobExpiration:[jobRemove intValue]];
+	}
+	
+	/* TODO: job cleaning  ––– not activated in this version*/
+	[reporter setShouldCleanJobs:NO];
+	
 	[reporter start];
 	[[NSRunLoop currentRunLoop] run];
 	

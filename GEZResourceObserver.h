@@ -24,6 +24,9 @@ __END_LICENSE__ */
 
 - (id)delegate;
 - (void)setDelegate:(id)anObject;
+
+- (XGResource *)resource;
+- (NSSet *)observedKeys;
 - (void)setObservedKeys:(NSSet *)keys;
 
 @end

@@ -6,7 +6,7 @@
 //  Copyright 2007 __MyCompanyName__. All rights reserved.
 //
 
-/* used to poseAsClass for GEZGridHook */
+/* used to poseAsClass for GEZGridHook. This way, I can keep the code for GEZGridHook and GEZServerHook unchanged and switch GEZGridHook instances with GEZGridHookExtended instances at runtime */
 
 #import "GEZGridHook.h"
 
@@ -25,5 +25,7 @@
 //private methods of the superclass GEZGridHook that I want to expose here and not in the GridEZ framework
 @interface GEZGridHook (GEZGridHookPrivate)
 - (id)initWithXgridGrid:(XGGrid *)aGrid serverHook:(GEZServerHook *)aServer;
+- (BOOL)checkIfLoaded;
+- (BOOL)checkIfAllJobsUpdated;
 @end
 
